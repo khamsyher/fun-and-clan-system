@@ -1,26 +1,108 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Premium blue: deep royal navy as the primary, cool porcelain surfaces,
+  and a restrained champagne-gold accent. Light only — the app is used on
+  phones in daylight and at gatherings.
+*/
+@theme {
+  --color-paper: #f3f5fa;
+  --color-surface: #ffffff;
+  --color-sunken: #e9edf5;
+  --color-line: #dce2ed;
+  --color-line-strong: #c3ccdc;
+
+  /* Text */
+  --color-ink: #0d1830;
+  --color-ink-soft: #3c4863;
+  --color-muted: #5b6680;
+
+  /* Primary */
+  --color-brand: #12357a;
+  --color-brand-2: #0c2862;
+  --color-brand-deep: #0a1f4d;
+  --color-brand-bright: #2a5fd0;
+  --color-brand-wash: #e6edfb;
+
+  /* Accent */
+  --color-gold: #c29a4a;
+  --color-gold-deep: #8a6620;
+  --color-gold-wash: #f2e4c3;
+
+  --color-ok: #23694a;
+  --color-ok-wash: #e1f0e7;
+  --color-warn: #875509;
+  --color-warn-wash: #f8ebcf;
+  --color-bad: #a3342a;
+  --color-bad-wash: #f8e1dd;
+
+  --font-sans: var(--font-public-sans), var(--font-noto-sans-lao), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-newsreader), var(--font-noto-serif-lao), ui-serif, Georgia, serif;
+
+  --shadow-soft: 0 1px 2px rgb(13 24 48 / 0.05), 0 8px 24px -12px rgb(18 53 122 / 0.22);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-bright);
+  outline-offset: 2px;
+}
+
+/* Deep blue panel with a soft light source in one corner. */
+.panel-brand {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(42 95 208 / 0.35), transparent 60%),
+    linear-gradient(160deg, var(--color-brand) 0%, var(--color-brand-deep) 100%);
+}
+
+/* Lao script: taller glyphs with stacked vowels need looser leading and no negative tracking. */
+:lang(lo) h1,
+:lang(lo) h2,
+:lang(lo) .font-display {
+  letter-spacing: 0 !important;
+  line-height: 1.4 !important;
+}
+:lang(lo) body {
+  line-height: 1.65;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0.5;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.5s var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
 }
