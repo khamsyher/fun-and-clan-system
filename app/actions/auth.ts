@@ -22,6 +22,7 @@ function pick(formData: FormData, keys: string[]) {
 export async function login(_state: FormState, formData: FormData): Promise<FormState> {
   const t = await getT();
   const values = pick(formData, ["phone", "password"]);
+  const next = String(formData.get("next") ?? "");
   const parsed = loginSchema(t.errors).safeParse(values);
   const echo = { phone: values.phone };
   if (!parsed.success) {
@@ -59,13 +60,16 @@ export async function login(_state: FormState, formData: FormData): Promise<Form
   if (user.status === "disabled") {
     return { message: t.auth.disabled, values: echo };
   }
-  if (user.role !== "super_admin" && !user.clan_active) {
+  // Only matters for someone who has a clan: a super admin and a general user have none.
+  if (user.clan_id && !user.clan_active) {
     return { message: t.auth.clanDisabled, values: echo };
   }
 
   await query(`UPDATE users SET last_login_at = now() WHERE id = $1`, [user.id]);
   await createSession(user.id, user.role, user.clan_id, user.session_version);
-  redirect(ROLE_HOME[user.role]);
+  // Return to the page they were sent from (e.g. a shared donation link), never off-site.
+  const safeNext = next.startsWith("/") && !next.startsWith("//") && /^[\w\-/]*$/.test(next.slice(1));
+  redirect(safeNext ? next : ROLE_HOME[user.role]);
 }
 
 export async function register(_state: FormState, formData: FormData): Promise<FormState> {
@@ -87,15 +91,20 @@ export async function register(_state: FormState, formData: FormData): Promise<F
   }
   const d = parsed.data;
 
-  const clan = await queryOne<{ id: string; name: string; is_active: boolean }>(
-    `SELECT id, name, is_active FROM clans WHERE code = $1`,
-    [d.clanCode],
-  );
-  if (!clan) {
-    return { errors: { clanCode: [t.auth.unknownClan] }, values: echo };
-  }
-  if (!clan.is_active) {
-    return { errors: { clanCode: [t.auth.clanInactive] }, values: echo };
+  // No clan code: they register as a general user, who sees only the donations area
+  // and can ask a clan to take them in later from their account page.
+  let clan: { id: string; name: string; is_active: boolean } | null = null;
+  if (d.clanCode) {
+    clan = await queryOne<{ id: string; name: string; is_active: boolean }>(
+      `SELECT id, name, is_active FROM clans WHERE code = $1`,
+      [d.clanCode],
+    );
+    if (!clan) {
+      return { errors: { clanCode: [t.auth.unknownClan] }, values: echo };
+    }
+    if (!clan.is_active) {
+      return { errors: { clanCode: [t.auth.clanInactive] }, values: echo };
+    }
   }
 
   const taken = await queryOne(`SELECT 1 FROM users WHERE phone = $1`, [d.phone]);
@@ -112,18 +121,28 @@ export async function register(_state: FormState, formData: FormData): Promise<F
   const passwordHash = await hashPassword(d.password);
   const inserted = await queryOne<{ id: string }>(
     `INSERT INTO users (clan_id, role, status, full_name, phone, email, village, password_hash)
-     VALUES ($1, 'member', 'pending', $2, $3, $4, $5, $6)
+     VALUES ($1, $2::user_role, $3::user_status, $4, $5, $6, $7, $8)
      RETURNING id`,
-    [clan.id, d.fullName, d.phone, d.email, d.village, passwordHash],
+    [
+      clan?.id ?? null,
+      clan ? "member" : "user",
+      clan ? "pending" : "active", // a general user has nobody to approve them
+      d.fullName,
+      d.phone,
+      d.email,
+      d.village,
+      passwordHash,
+    ],
   );
-  await query(
-    `INSERT INTO audit_logs (clan_id, actor_id, action, target_id) VALUES ($1, $2, 'member.registered', $2)`,
-    [clan.id, inserted!.id],
-  );
+  await query(`INSERT INTO audit_logs (clan_id, actor_id, action, target_id) VALUES ($1, $2, $3, $2)`, [
+    clan?.id ?? null,
+    inserted!.id,
+    clan ? "member.registered" : "user.registered",
+  ]);
 
-  return {
-    success: fmt(t.auth.registered, { clan: clan.name }),
-  };
+  return clan
+    ? { success: fmt(t.auth.registered, { clan: clan.name }) }
+    : { success: t.auth.registeredNoClan, kind: "ready" };
 }
 
 export async function logout() {

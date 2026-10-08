@@ -53,7 +53,7 @@ export async function changePassword(_state: FormState, formData: FormData): Pro
 
 /**
  * Gives someone a new temporary password when they are locked out.
- * A clan leader can reset members of their own clan; the super admin can reset clan leaders.
+ * A clan leader can reset members of their own clan; the super admin can reset anyone but another super admin.
  */
 export async function resetPassword(_state: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireRole("clan_admin", "super_admin");
@@ -71,7 +71,7 @@ export async function resetPassword(_state: FormState, formData: FormData): Prom
         )
       : await queryOne<{ full_name: string; clan_id: string }>(
           `UPDATE users SET password_hash = $2, password_changed_at = now(), session_version = session_version + 1, updated_at = now()
-            WHERE id = $1 AND role = 'clan_admin'
+            WHERE id = $1 AND role <> 'super_admin'
             RETURNING full_name, clan_id`,
           [userId, await hashPassword(temp)],
         );
@@ -82,7 +82,13 @@ export async function resetPassword(_state: FormState, formData: FormData): Prom
     actor.id,
     userId,
   ]);
-  revalidatePath(actor.role === "clan_admin" ? "/clan" : "/admin");
+  if (actor.role === "clan_admin") {
+    revalidatePath("/clan");
+  } else {
+    revalidatePath("/admin");
+    revalidatePath("/admin/users");
+    revalidatePath(`/admin/users/${userId}`);
+  }
   return { success: temp, values: { name: target.full_name } };
 }
 

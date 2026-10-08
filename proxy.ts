@@ -9,7 +9,7 @@ const ROLE_AREAS: { prefix: string; role: Role }[] = [
   { prefix: "/clan", role: "clan_admin" },
   { prefix: "/member", role: "member" },
 ];
-const SIGNED_IN = ["/account", "/files"];
+const SIGNED_IN = ["/account", "/files", "/donations", "/notifications"];
 const GUEST_ONLY = ["/login", "/register"];
 
 export default async function proxy(req: NextRequest) {
@@ -29,7 +29,10 @@ export default async function proxy(req: NextRequest) {
   }
 
   if (session && (path === "/" || GUEST_ONLY.includes(path))) {
-    return NextResponse.redirect(new URL(ROLE_HOME[session.role], req.nextUrl));
+    // Already signed in and following a shared link: go where the link pointed.
+    const next = req.nextUrl.searchParams.get("next") ?? "";
+    const safe = next.startsWith("/") && !next.startsWith("//");
+    return NextResponse.redirect(new URL(safe ? next : ROLE_HOME[session.role], req.nextUrl));
   }
 
   return NextResponse.next();

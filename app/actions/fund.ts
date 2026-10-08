@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { query, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { audit, lockClan, parseKip, settleCarried, UUID_RE } from "@/lib/funds";
+import { direct, notify } from "@/lib/notify";
 import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
 import { formatKip } from "@/lib/format";
@@ -81,6 +82,7 @@ export async function setTreasurer(formData: FormData) {
       on ? "treasurer.assigned" : "treasurer.removed",
       memberId,
     ]);
+    if (on) await notify(direct, memberId, "treasurer_assigned", {}, "/member/approvals");
   }
   revalidatePath("/clan", "layout");
 }

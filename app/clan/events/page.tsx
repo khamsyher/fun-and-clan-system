@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeading } from "@/components/app-shell";
 import { EventList } from "@/components/event-list";
-import { buttonPrimary } from "@/components/ui";
+import { buttonPrimary } from "@/components/button-styles";
 import { requireRole } from "@/lib/dal";
 import { listEvents } from "@/lib/events";
 import { getLocale, getT } from "@/lib/i18n/server";

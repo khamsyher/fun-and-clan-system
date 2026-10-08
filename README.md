@@ -12,6 +12,10 @@ Multi-tenant funeral mutual-aid fund platform for Lao clans. Next.js 16 · Tailw
 
 **Phase 5:** income and expense reports for any date range with Excel and PDF export (in the viewer's language, Lao included), and a platform statistics report for the Super Admin.
 
+**Donations:** any member or leader can ask for help, every signed-in user of every clan sees the requests, donors upload a transfer slip, and the person who asked confirms it arrived.
+
+**General users:** someone who belongs to no Seng can register without a clan code, use the donations area only, and later send a clan code to that clan's leader to become a member.
+
 ### Upgrading an existing database
 Run `npm run db:setup` again after pulling new code. The schema only adds what is missing and never deletes data.
 
@@ -23,6 +27,7 @@ Run `npm run db:setup` again after pulling new code. The schema only adds what i
    DATABASE_URL=postgresql://postgres:<your-password>@localhost:5432/fund_clan
    ```
    Change `SUPER_ADMIN_PHONE` / `SUPER_ADMIN_PASSWORD` to your own before the next step.
+   When you deploy, also set `SITE_URL` to the public address (e.g. `https://fund.example.la`), so shared donation links and their Facebook previews point at the real site. On localhost it is worked out from the request and can be left unset.
 3. **Create tables + your super admin account:**
    ```
    npm run db:setup            # schema + super admin
@@ -38,15 +43,21 @@ Run `npm run db:setup` again after pulling new code. The schema only adds what i
 | Clan Leader (VANG01) | 02011111111 | Password123 |
 | Member | 02022222222 | Password123 |
 | Pending members | 02033333333, 02044444444 | Password123 |
+| General user (no clan) | 02085555555 | Password123 |
 
 ## How it works
 
 | Flow | Behaviour |
 |---|---|
-| Register (`/register`) | Member enters the clan code → account created as **pending** |
+| Register (`/register`) | The clan code is **optional**. With one, the account is created as **pending** for that clan. Without one, the person becomes a **general user** straight away and can sign in at once |
 | Leader approval (`/clan`) | Leader approves or declines. Only then can the member sign in |
-| Sign in (`/login`) | Phone + password → redirected to `/admin`, `/clan` or `/member` by role |
+| General users | Someone who is in no Seng. They see **only the donations area** — no clan fund, events, payments or family — and can ask for help and give like anyone else. `/member`, `/clan` and `/admin` are out of reach |
+| Joining a clan later (`/account`) | A general user sends a clan code to that clan's leader, who sees the request on `/clan` and approves or declines it. Approving makes them a **member** of that clan; because their role changed, their old session ends and they sign in again. They can take a waiting request back and ask a different clan |
+| Sign in (`/login`) | Phone + password → redirected to `/admin`, `/clan`, `/member` or `/donations` by role |
 | Super Admin (`/admin`) | Create clans and their leader accounts, enable or disable clans, set the platform fee %, reset a leader's password |
+| People (`/admin`) | One card per kind of account — everyone, clan leaders, members, general users, awaiting approval — each opening that part of the user list |
+| Users (`/admin/users`) | Every account on the platform: name, phone, email, role, clan (or "no clan"), status and last sign-in. Searchable by name, phone, email or clan code, and filtered by kind (`?people=leaders`, `members`, `general`, `waiting`). From here the Super Admin can **block** an account (which signs that person out at once), give someone a **new temporary password**, or **delete** an account |
+| One person (`/admin/users/[id]`) | Everything about one account — village, when they joined, who approved them, last sign-in, when the password last changed — with counts of their family, requests for help, donations, unpaid bills and slips, the history of what has been done to the account, and the same three actions |
 | Fund settings (`/clan/settings`) | Leader changes fund mode (A/B), amount and Mode A schedule. Each change needs a meeting date and the minutes (JPG/PNG/WebP/PDF, max 5 MB); every version is kept with its document |
 | Family (`/member/family`) | Member adds, edits and removes spouse, children and parents; the leader sees each member's family on `/clan` |
 | Events (`/clan/events`) | Leader reports a death (member or dependent). **Mode B:** one bill per member account at the locked rate; leader records cash/transfer payments (with undo); closing turns unpaid bills into debt that shows on the next bill, and records the platform fee. **Mode A:** payout comes from the central fund; the fee is taken on the payout |
@@ -59,7 +70,10 @@ Run `npm run db:setup` again after pulling new code. The schema only adds what i
 | Contributions (`/clan/contributions`) | Mode A only: leader opens a period (`2026-09` or `2026`) and every active member gets a due at the locked rate; paid by slip or recorded as cash |
 | Reports (`/clan/reports`) | Leader picks a date range (or this month / this year / last year / all time) and sees opening balance, income by type, expenses, corrections, closing balance, each funeral event, contributions, what is still owed, and the ledger. **Export Excel** (numbers stay numbers, formatted in ₭) or **Export PDF** (A4 landscape, page numbers) |
 | Platform report (`/admin/reports`) | Super Admin: per-clan totals (members, events, collected, paid out, fees owed/received) and fees by month, with the same Excel/PDF export. Totals only, no member-level data |
-| Account (`/account`) | Everyone can change their password; this signs out their other devices. Leaders can reset a member's password, and the Super Admin can reset a leader's |
+| Donations (`/donations`) | **Cross-clan.** A member or leader posts a request (title, story, optional target and deadline, photo, bank account / QR). Everyone signed in sees all requests and can give: the donor uploads their transfer slip, optionally anonymously, and the **person who asked** confirms it arrived or rejects it with a reason. Only confirmed donations count towards the total. The asker can **edit** their request afterwards (details, payment information, photo/QR) and close or reopen it |
+| Sharing a request (`/d/[id]`) | Every request has a **public page** that opens without signing in, for Facebook, WhatsApp, Telegram or a copied link. It shows the title, story, photo and progress, and deliberately **not** the bank account, QR code or donor names. A visitor who wants to give is sent to sign in and comes straight back to the request |
+| Notifications (bell in the header, `/notifications`) | Each person is told what concerns them: registration approved, a new collection and what they owe, debt carried over, slips uploaded/approved/rejected, payouts awaiting a treasurer and paid, savings periods opened, and donations received/confirmed/rejected. The bell shows the unread count; opening it marks them read |
+| Account (`/account`) | Everyone sees their name, phone, role, **account status** and clan (or "not in a clan yet"), and can change their password; this signs out their other devices. Leaders can reset a member's password, and the Super Admin can reset a leader's |
 
 ### Security & tenant isolation
 - Passwords are hashed with scrypt (`lib/password.ts`).
@@ -67,6 +81,12 @@ Run `npm run db:setup` again after pulling new code. The schema only adds what i
 - `proxy.ts` does fast cookie-only role redirects. `lib/dal.ts` re-checks the user **in the database on every request**, so a disabled user or clan loses access immediately.
 - **Strict rate compliance is enforced by the database:** a trigger rejects any change to a clan's mode or rate, including one made directly in Navicat, unless the same transaction records an approved change with its meeting minutes.
 - **Money is tamper-evident:** an event's rate, mode and fee % are locked by a trigger, bill amounts can't change, and `fund_ledger` is append-only, so corrections are reversing entries.
+- **The public share page gives nothing away:** `/d/[id]` serves only the title, story, cover photo and totals — never the bank account, QR code, donor names or amounts — and it is marked `noindex` so it stays out of search results. Only the cover photo of a live request is public (`/d/[id]/photo`); every other upload still needs a session.
+- **The Super Admin sees accounts, not a clan's money:** `/admin/users` shows every account (name, phone, role, clan, status) so the platform owner can support and audit the system, and counts of what each person has done — never the amounts. No member's payments, bills, debts or family are readable, the platform report stays totals-only, and the Super Admin still cannot open a clan's fund or events.
+- **A Super Admin account can't be blocked or deleted**, by anyone including itself, so the platform can never be locked out of its own administration. Blocking bumps `session_version`, so the blocked person is signed out within the same request rather than when their week-old cookie expires.
+- **Deleting an account is only possible when nothing depends on it.** Bills, slips, payouts, events and donations hold the row with `ON DELETE RESTRICT`; the database refusing is what the delete relies on, and the answer offered is to block the account instead. Money history can never be erased by deleting a person.
+- **A general user is outside every clan:** the database itself requires `clan_id IS NULL` for them (and for the Super Admin), and a clan's queries only ever see people who were let in — asking to join writes to `clan_join_requests`, never to the clan. Approving is the only thing that sets `clan_id`, and it bumps `session_version`, so the older session carrying the old role dies immediately.
+- **Donations stay out of the clan fund:** money goes directly to the person who asked, so nothing is written to `fund_ledger`. Donation photos and QR codes are visible to every signed-in user; donation slips only to the donor and the asker.
 - **Slips are private:** only the member who uploaded a slip and their clan leader can open it. Payments recorded from a slip can't be undone by hand.
 - Uploaded files are stored in the `files` table and served only to signed-in users of the same clan (`/files/[id]`). The type is checked from the file content, not the file name.
 - Every clan query is scoped by the signed-in user's `clan_id`. A leader can't read or change another clan's members, even by sending a forged member id.
@@ -76,13 +96,13 @@ English, Lao and Hmong via the language button (top right). Text lives in `lib/i
 
 ## Structure
 ```
-db/schema.sql          tables: clans, users, dependents, platform_settings, audit_logs
+db/schema.sql          tables: clans, users, dependents, clan_join_requests, platform_settings, audit_logs
 scripts/db-setup.ts    applies schema, seeds super admin (+ demo)
 lib/                   db pool, session, DAL, validation (zod), formatting
 lib/i18n/              dictionaries (en, lo, hmn) + locale cookie helpers
 proxy.ts               optimistic route guard
 app/(auth)/            login + register
-app/admin|clan|member  role dashboards
+app/admin|clan|member  role dashboards (admin/users: account management)
 app/actions/           server actions (auth, admin, clan)
 ```
 

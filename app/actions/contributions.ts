@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { query, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { audit, lockClan, UUID_RE } from "@/lib/funds";
+import { clanMemberIds, notifyMany } from "@/lib/notify";
+import { formatKip } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
 import type { FormState } from "@/lib/definitions";
@@ -51,6 +53,10 @@ export async function openPeriod(_state: FormState, formData: FormData): Promise
         [leader.clanId, period.rows[0].id, clan.contribution_amount],
       );
       await audit(db, leader.clanId, leader.id, "contribution.period_opened", period.rows[0].id, { label });
+      await notifyMany(db, await clanMemberIds(db, leader.clanId!), "period_opened", {
+        label,
+        amount: formatKip(clan.contribution_amount),
+      }, "/member/payments");
       return dues.rowCount ?? 0;
     });
     refresh();

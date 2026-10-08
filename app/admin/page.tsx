@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHeading, Section } from "@/components/app-shell";
 import { StatusBadge } from "@/components/badge";
+import { ArrowRightIcon } from "@/components/icons";
 import { ResetPasswordButton } from "@/components/reset-password";
 import { requireRole } from "@/lib/dal";
 import { query, queryOne } from "@/lib/db";
@@ -10,6 +12,8 @@ import { getLocale, getT } from "@/lib/i18n/server";
 import { markFeeReceived, setClanActive } from "@/app/actions/admin";
 import { Pill } from "@/components/badge";
 import { CreateClanForm, PlatformFeeForm } from "./forms";
+import { countPeople } from "@/lib/users";
+import { PeopleCard } from "./people-card";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).admin.metaTitle };
@@ -34,7 +38,7 @@ export default async function AdminPage() {
   const [t, locale] = await Promise.all([getT(), getLocale()]);
   const a = t.admin;
 
-  const [clans, totals, settings, money, fees] = await Promise.all([
+  const [clans, totals, settings, money, fees, counts] = await Promise.all([
     query<ClanRow>(
       `SELECT c.id, c.code, c.name, c.fund_mode, c.contribution_amount, c.is_active, c.created_at,
               l.full_name AS leader, l.id AS leader_id,
@@ -69,6 +73,7 @@ export default async function AdminPage() {
         ORDER BY (f.status = 'owed') DESC, f.created_at DESC
         LIMIT 50`,
     ),
+    countPeople(),
   ]);
 
   const fee = settings?.platform_fee_percent ?? "1.50";
@@ -89,6 +94,25 @@ export default async function AdminPage() {
         <Stat label={a.feesOwed} value={formatKip(money?.owed ?? 0)} note={a.feesTitle} />
         <Stat label={a.feesReceived} value={formatKip(money?.received ?? 0)} note={a.feesTitle} />
       </dl>
+
+      <Section
+        title={a.usersTitle}
+        aside={
+          <Link href="/admin/users" className="inline-flex items-center gap-1.5 font-semibold text-brand hover:text-brand-bright">
+            {a.manageUsers}
+            <ArrowRightIcon width={16} height={16} />
+          </Link>
+        }
+      >
+        {/* One card per kind of account; each opens that part of the user list. */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <PeopleCard label={a.filterAll} value={counts?.everyone ?? 0} href="/admin/users" />
+          <PeopleCard label={a.filterLeaders} value={counts?.leaders ?? 0} href="/admin/users?people=leaders" />
+          <PeopleCard label={a.filterMembers} value={counts?.members ?? 0} href="/admin/users?people=members" />
+          <PeopleCard label={a.filterGeneral} value={counts?.general ?? 0} href="/admin/users?people=general" />
+          <PeopleCard label={a.filterWaiting} value={counts?.waiting ?? 0} href="/admin/users?people=waiting" tone="warn" />
+        </div>
+      </Section>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0">
@@ -224,6 +248,7 @@ export default async function AdminPage() {
           </Section>
         </div>
       </div>
+
     </>
   );
 }

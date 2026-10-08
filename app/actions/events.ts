@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { audit, feeFor, isPastDate, lockClan, settleCarried, UUID_RE } from "@/lib/funds";
+import { clanMemberIds, notifyMany } from "@/lib/notify";
+import { formatKip } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import type { FormState } from "@/lib/definitions";
 
@@ -100,6 +102,13 @@ export async function reportDeath(_state: FormState, formData: FormData): Promis
       }
 
       await audit(db, leader.clanId, leader.id, "event.reported", id, { event_no: nextNo, mode: clan.fund_mode });
+      // Mode B bills everyone at once, so tell every member what they owe.
+      if (clan.fund_mode === "B") {
+        await notifyMany(db, await clanMemberIds(db, leader.clanId!), "event_new", {
+          name: person.name,
+          amount: formatKip(clan.contribution_amount),
+        }, `/member/events/${id}`);
+      }
       return id;
     });
   } catch (err) {
@@ -233,6 +242,16 @@ export async function closeCollection(_state: FormState, formData: FormData): Pr
          VALUES ($1, 'platform_fee', $2, $3, $4, $5)`,
         [leader.clanId, -fee, eventId, `${event.platform_fee_percent}%`, leader.id],
       );
+    }
+    // Whoever did not pay now carries a debt: tell them.
+    const carried = await db.query<{ member_id: string; amount: string }>(
+      `SELECT b.member_id, b.amount FROM event_bills b WHERE b.event_id = $1 AND b.status = 'carried'`,
+      [eventId],
+    );
+    const name = (await db.query<{ deceased_name: string }>(`SELECT deceased_name FROM death_events WHERE id = $1`, [eventId])).rows[0]
+      .deceased_name;
+    for (const row of carried.rows) {
+      await notifyMany(db, [row.member_id], "event_debt", { name, amount: formatKip(row.amount) }, "/member/payments");
     }
     await audit(db, leader.clanId, leader.id, "event.collection_closed", eventId, { gross, fee });
     return true;

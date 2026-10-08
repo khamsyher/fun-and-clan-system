@@ -6,6 +6,8 @@ import { transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { readUpload } from "@/lib/files";
 import { audit, isPastDate, lockClan, parseKip, settleCarried, UUID_RE } from "@/lib/funds";
+import { clanLeaderId, notify } from "@/lib/notify";
+import { formatKip } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import type { FormState } from "@/lib/definitions";
 
@@ -73,6 +75,8 @@ export async function uploadSlip(_state: FormState, formData: FormData): Promise
         ],
       );
       await audit(db, me.clanId, me.id, "slip.uploaded", slip.rows[0].id, { amount });
+      const leader = await clanLeaderId(db, me.clanId!);
+      if (leader) await notify(db, leader, "slip_uploaded", { name: me.fullName, amount: formatKip(amount!) }, "/clan/slips");
       return true;
     });
     if (!ok) return { message: t.errTarget, values };
@@ -160,6 +164,14 @@ export async function reviewSlip(_state: FormState, formData: FormData): Promise
       note,
     ]);
     await audit(db, leader.clanId, leader.id, `slip.${decision}`, slip.id, note ? { note } : undefined);
+    const paid = (await db.query<{ amount_claimed: string }>(`SELECT amount_claimed FROM payment_slips WHERE id = $1`, [slip.id])).rows[0];
+    await notify(
+      db,
+      slip.member_id,
+      decision === "approved" ? "slip_approved" : "slip_rejected",
+      decision === "approved" ? { amount: formatKip(paid.amount_claimed) } : { note: note ?? "" },
+      "/member/payments",
+    );
     return { success: decision === "approved" ? t.approved : t.rejected };
   });
 

@@ -6,6 +6,8 @@ import { transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { readUpload } from "@/lib/files";
 import { audit, availableForPayout, feeFor, fundBalance, lockClan, parseKip, UUID_RE } from "@/lib/funds";
+import { clanLeaderId, clanMemberIds, clanTreasurerIds, notify, notifyMany } from "@/lib/notify";
+import { formatKip } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import type { FormState } from "@/lib/definitions";
 
@@ -67,6 +69,10 @@ export async function requestPayout(_state: FormState, formData: FormData): Prom
       [leader.clanId, eventId, amount, receiverName, receiverPhone, note, leader.id],
     );
     await audit(db, leader.clanId, leader.id, "payout.requested", payout.rows[0].id, { amount, event_id: eventId });
+    await notifyMany(db, await clanTreasurerIds(db, leader.clanId!), "payout_requested", {
+      name: leader.fullName,
+      amount: formatKip(amount!),
+    }, "/member/approvals");
     refresh();
     return { success: "ok" };
   });
@@ -108,6 +114,16 @@ export async function decidePayout(_state: FormState, formData: FormData): Promi
       [payout.id, decision, treasurer.id, note],
     );
     await audit(db, treasurer.clanId, treasurer.id, `payout.${decision}`, payout.id, note ? { note } : undefined);
+    const leaderId = await clanLeaderId(db, treasurer.clanId!);
+    if (leaderId) {
+      await notify(
+        db,
+        leaderId,
+        decision === "approved" ? "payout_approved" : "payout_rejected",
+        decision === "approved" ? { name: treasurer.fullName, amount: formatKip(payout.amount) } : { name: treasurer.fullName, note: note ?? "" },
+        `/clan/events`,
+      );
+    }
     return "done";
   });
   if (result !== "done") return result;
@@ -187,6 +203,12 @@ export async function markPayoutPaid(_state: FormState, formData: FormData): Pro
     }
     await db.query(`UPDATE death_events SET status = 'completed', completed_at = now() WHERE id = $1`, [payout.event_id]);
     await audit(db, leader.clanId, leader.id, "payout.paid", payout.id, { amount, fee, method });
+    // Everyone who contributed can see where the money went.
+    const receiver = (await db.query<{ receiver_name: string }>(`SELECT receiver_name FROM payouts WHERE id = $1`, [payout.id])).rows[0];
+    await notifyMany(db, await clanMemberIds(db, leader.clanId!), "payout_paid", {
+      amount: formatKip(amount),
+      receiver: receiver.receiver_name,
+    }, `/member/events/${payout.event_id}`);
     refresh();
     return { success: "ok" };
   });

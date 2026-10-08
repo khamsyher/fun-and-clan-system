@@ -10,6 +10,8 @@ import { formatDate, formatKip, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { decideMember } from "@/app/actions/clan";
+import { decideJoinRequest } from "@/app/actions/membership";
+import { pendingJoinRequests } from "@/lib/membership";
 import { setTreasurer } from "@/app/actions/fund";
 import { Pill } from "@/components/badge";
 import type { Relationship, UserStatus } from "@/lib/definitions";
@@ -36,7 +38,7 @@ export default async function ClanPage() {
   const c = t.clan;
 
   // Every query here is scoped to the leader's own clan_id.
-  const [clan, people, family] = await Promise.all([
+  const [clan, people, family, joining] = await Promise.all([
     queryOne<{ code: string; name: string; fund_mode: "A" | "B"; contribution_amount: string; contribution_period: "monthly" | "yearly" | null }>(
       `SELECT code, name, fund_mode, contribution_amount, contribution_period FROM clans WHERE id = $1`,
       [leader.clanId],
@@ -52,6 +54,7 @@ export default async function ClanPage() {
       `SELECT member_id, full_name, relationship FROM dependents WHERE clan_id = $1 AND is_active ORDER BY created_at`,
       [leader.clanId],
     ),
+    pendingJoinRequests(leader.clanId!),
   ]);
 
   const familyOf = new Map<string, { full_name: string; relationship: Relationship }[]>();
@@ -121,6 +124,34 @@ export default async function ClanPage() {
                 <div className="flex gap-2">
                   <DecisionButton memberId={p.id} decision="reject" label={c.decline} />
                   <DecisionButton memberId={p.id} decision="approve" label={c.approve} primary />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section title={c.joinTitle} aside={joining.length ? fmt(c.people, { n: joining.length }) : undefined}>
+        {joining.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-8 text-center text-sm text-ink-soft">
+            {fmt(c.noneJoining, { code: clan?.code ?? "" })}
+          </p>
+        ) : (
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+            {joining.map((j) => (
+              <li key={j.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink">{j.full_name}</p>
+                  <p className="mt-0.5 text-sm text-ink-soft">
+                    <span className="tabular">{j.phone}</span>
+                    {j.village && <> · {j.village}</>}
+                    {j.email && <> · {j.email}</>}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">{fmt(c.askedOn, { date: formatDate(j.created_at, locale) })}</p>
+                </div>
+                <div className="flex gap-2">
+                  <JoinButton requestId={j.id} decision="reject" label={c.decline} />
+                  <JoinButton requestId={j.id} decision="approve" label={c.approve} primary />
                 </div>
               </li>
             ))}
@@ -219,6 +250,37 @@ function DecisionButton({
       <input type="hidden" name="decision" value={decision} />
       <button type="submit" className={cls}>
         {!subtle && (decision === "approve" ? <CheckIcon width={16} height={16} /> : <XIcon width={16} height={16} />)}
+        {label}
+      </button>
+    </form>
+  );
+}
+
+/** Approve or decline a general user who sent this clan's code. */
+function JoinButton({
+  requestId,
+  decision,
+  label,
+  primary,
+}: {
+  requestId: string;
+  decision: "approve" | "reject";
+  label: string;
+  primary?: boolean;
+}) {
+  return (
+    <form action={decideJoinRequest} className="flex flex-1 sm:flex-none">
+      <input type="hidden" name="requestId" value={requestId} />
+      <input type="hidden" name="decision" value={decision} />
+      <button
+        type="submit"
+        className={
+          primary
+            ? "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-soft hover:bg-brand-2 sm:flex-none"
+            : "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-ink hover:bg-bad-wash hover:text-bad sm:flex-none"
+        }
+      >
+        {decision === "approve" ? <CheckIcon width={16} height={16} /> : <XIcon width={16} height={16} />}
         {label}
       </button>
     </form>

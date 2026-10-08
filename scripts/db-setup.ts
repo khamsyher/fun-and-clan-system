@@ -61,8 +61,15 @@ async function seedDemo(client: Client) {
       [clanId, role, status, fullName, phone, pw],
     );
   }
+  // A general user: in no clan, so they see only the donations area.
+  await client.query(
+    `INSERT INTO users (clan_id, role, status, full_name, phone, password_hash)
+     VALUES (NULL, 'user', 'active', 'Bee Lor', '02085555555', $1) ON CONFLICT (phone) DO NOTHING`,
+    [pw],
+  );
   console.log("✓ Demo clan VANG01 seeded (all demo passwords: Password123)");
   console.log("    leader 02011111111 · member 02022222222 · pending 02033333333, 02044444444");
+  console.log("    general user (no clan) 02085555555");
 }
 
 main().catch((err) => {

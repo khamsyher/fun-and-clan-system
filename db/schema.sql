@@ -472,3 +472,128 @@ CREATE UNIQUE INDEX IF NOT EXISTS payment_slips_one_pending_due ON payment_slips
 
 ALTER TABLE fund_ledger ADD COLUMN IF NOT EXISTS due_id UUID REFERENCES contribution_dues(id) ON DELETE RESTRICT;
 ALTER TABLE fund_ledger ADD COLUMN IF NOT EXISTS slip_id UUID REFERENCES payment_slips(id) ON DELETE RESTRICT;
+
+-- ===========================================================================
+-- Donations: a member or leader asks for help (illness, fire, school fees...).
+-- Visible to every signed-in user across all clans; donors transfer money
+-- directly to the person who asked, so none of this touches a clan's fund ledger.
+-- ===========================================================================
+
+DO $$ BEGIN
+  CREATE TYPE donation_request_status AS ENUM ('open', 'closed', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE donation_status AS ENUM ('pending', 'confirmed', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS donation_requests (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clan_id        UUID NOT NULL REFERENCES clans(id) ON DELETE RESTRICT, -- the asker's clan, shown for context
+  created_by     UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  title          VARCHAR(150) NOT NULL,
+  story          TEXT NOT NULL,
+  target_amount  BIGINT CHECK (target_amount IS NULL OR target_amount > 0), -- optional goal
+  deadline       DATE,
+  bank_name      VARCHAR(100),
+  account_name   VARCHAR(150),
+  account_number VARCHAR(50),
+  photo_file_id  UUID REFERENCES files(id) ON DELETE RESTRICT, -- cover photo (public to signed-in users)
+  qr_file_id     UUID REFERENCES files(id) ON DELETE RESTRICT, -- payment QR (public to signed-in users)
+  status         donation_request_status NOT NULL DEFAULT 'open',
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at      TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS donation_requests_feed_idx ON donation_requests (status, created_at DESC);
+
+-- One donation: the donor uploads proof of transfer, the asker confirms it arrived.
+CREATE TABLE IF NOT EXISTS donations (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id    UUID NOT NULL REFERENCES donation_requests(id) ON DELETE RESTRICT,
+  donor_id      UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  amount        BIGINT NOT NULL CHECK (amount > 0),
+  transfer_date DATE NOT NULL,
+  message       TEXT,
+  anonymous     BOOLEAN NOT NULL DEFAULT FALSE, -- hides the donor's name from everyone but the asker
+  slip_file_id  UUID NOT NULL REFERENCES files(id) ON DELETE RESTRICT,
+  status        donation_status NOT NULL DEFAULT 'pending',
+  review_note   TEXT,
+  reviewed_at   TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS donations_request_idx ON donations (request_id, status);
+CREATE INDEX IF NOT EXISTS donations_donor_idx ON donations (donor_id, created_at DESC);
+
+-- A donation's amount is fixed once given; only its review status may change.
+CREATE OR REPLACE FUNCTION lock_donation_amount() RETURNS trigger AS $$
+BEGIN
+  IF NEW.amount IS DISTINCT FROM OLD.amount OR NEW.donor_id IS DISTINCT FROM OLD.donor_id
+     OR NEW.request_id IS DISTINCT FROM OLD.request_id OR NEW.slip_file_id IS DISTINCT FROM OLD.slip_file_id THEN
+    RAISE EXCEPTION 'A donation record is locked and cannot be changed';
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS donations_amount_lock ON donations;
+CREATE TRIGGER donations_amount_lock BEFORE UPDATE ON donations
+  FOR EACH ROW EXECUTE FUNCTION lock_donation_amount();
+
+-- ===========================================================================
+-- Notifications: one row per person per thing that happened. Written by the
+-- actions that cause them; the text itself is built from `type` + `params`
+-- so every reader sees it in their own language.
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type       VARCHAR(40) NOT NULL,
+  params     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  link       VARCHAR(200),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS notifications_unread_idx ON notifications (user_id) WHERE read_at IS NULL;
+
+-- ===========================================================================
+-- General users: someone who is not in any Seng (clan). They register without a
+-- clan code, see only the donations area, and can ask a clan's leader to let
+-- them in later. Additive and re-runnable.
+-- ===========================================================================
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'user';
+
+-- A general user has no clan; members and leaders must have one.
+-- Written as role::text on purpose: PostgreSQL refuses to use an enum value in the
+-- same transaction that added it, and db/schema.sql is applied in one go.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_clan_required;
+ALTER TABLE users ADD CONSTRAINT users_clan_required CHECK (
+  (role::text IN ('super_admin', 'user') AND clan_id IS NULL) OR
+  (role::text IN ('clan_admin', 'member') AND clan_id IS NOT NULL)
+);
+
+-- Donation requests, and the photos attached to them, may come from someone with no clan.
+ALTER TABLE donation_requests ALTER COLUMN clan_id DROP NOT NULL;
+ALTER TABLE files ALTER COLUMN clan_id DROP NOT NULL;
+
+DO $$ BEGIN
+  -- pending: waiting for the clan leader | withdrawn: taken back by the asker
+  CREATE TYPE join_status AS ENUM ('pending', 'approved', 'rejected', 'withdrawn');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- A general user asking to join a clan. Approving it is what turns them into a
+-- member, so every clan-scoped query keeps seeing only people who were let in.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clan_join_requests (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clan_id     UUID NOT NULL REFERENCES clans(id) ON DELETE RESTRICT,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status      join_status NOT NULL DEFAULT 'pending',
+  note        TEXT, -- the leader's reason when declined
+  decided_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  decided_at  TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One request at a time per person, so nobody can queue up at every clan at once.
+CREATE UNIQUE INDEX IF NOT EXISTS clan_join_requests_one_pending ON clan_join_requests (user_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS clan_join_requests_clan_idx ON clan_join_requests (clan_id, status, created_at DESC);

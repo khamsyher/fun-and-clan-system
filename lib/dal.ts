@@ -41,7 +41,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   );
 
   if (!user || user.status !== "active") return null;
-  if (user.role !== "super_admin" && !user.clanActive) return null;
+  // Disabling a clan locks its people out at once. A super admin and a general user have no clan.
+  if (user.clanId && !user.clanActive) return null;
   // A password change or reset bumps the version, ending every older session.
   if (user.sessionVersion !== session.sessionVersion) return null;
   return user;

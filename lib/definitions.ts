@@ -1,7 +1,8 @@
 import * as z from "zod";
 import type { Dictionary } from "./i18n/config";
 
-export type Role = "super_admin" | "clan_admin" | "member";
+/** `user` is a general user: signed up without a clan code, so they only see donations. */
+export type Role = "super_admin" | "clan_admin" | "member" | "user";
 export type UserStatus = "pending" | "active" | "rejected" | "disabled";
 
 export type SessionPayload = {
@@ -17,7 +18,11 @@ export const ROLE_HOME: Record<Role, string> = {
   super_admin: "/admin",
   clan_admin: "/clan",
   member: "/member",
+  user: "/donations",
 };
+
+/** Everyone who may ask for help and give: the three roles that are not the platform owner. */
+export const DONOR_ROLES: Role[] = ["member", "clan_admin", "user"];
 
 export const RELATIONSHIPS = ["spouse", "child", "father", "mother"] as const;
 export type Relationship = (typeof RELATIONSHIPS)[number];
@@ -53,7 +58,13 @@ export const loginSchema = (e: Errors) =>
 export const registerSchema = (e: Errors) =>
   z
     .object({
-      clanCode: z.string().trim().toUpperCase().min(2, { error: e.clanCodeRequired }).max(20),
+      // Optional: left empty, the person registers as a general user and joins a clan later.
+      clanCode: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .refine((v) => v === "" || /^[A-Z0-9-]{2,20}$/.test(v), { error: e.clanCodeFormat })
+        .transform((v) => (v === "" ? null : v)),
       fullName: z.string().trim().min(2, { error: e.fullNameRequired }).max(150),
       phone: phone(e),
       email: optionalText.pipe(z.email({ error: e.emailInvalid }).nullable()),
@@ -65,6 +76,16 @@ export const registerSchema = (e: Errors) =>
       path: ["confirmPassword"],
       error: e.passwordsMismatch,
     });
+
+/** Just a clan code, used when a general user asks to join a clan. */
+export const clanCodeSchema = (e: Errors) =>
+  z.object({
+    clanCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9-]{2,20}$/, { error: e.clanCodeFormat }),
+  });
 
 export const createClanSchema = (e: Errors) =>
   z.object({
@@ -84,6 +105,8 @@ export type FormState =
       errors?: Record<string, string[] | undefined>;
       message?: string;
       success?: string;
+      /** Which success panel to show, when an action has more than one. */
+      kind?: string;
       values?: Record<string, string>;
     }
   | undefined;

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
+import { direct, notify } from "@/lib/notify";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -39,6 +40,11 @@ export async function decideMember(formData: FormData) {
       `INSERT INTO audit_logs (clan_id, actor_id, action, target_id) VALUES ($1, $2, $3, $4)`,
       [leader.clanId, leader.id, decision.action, memberId],
     );
+    if (decision.action === "member.approved") {
+      await notify(direct, memberId, "member_approved", { clan: leader.clanName ?? "" }, "/member");
+    } else if (decision.action === "member.rejected") {
+      await notify(direct, memberId, "member_rejected", {}, "/login");
+    }
   }
   revalidatePath("/clan");
 }

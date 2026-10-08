@@ -13,6 +13,7 @@ import {
 import { useFormStatus } from "react-dom";
 import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon, UploadIcon } from "./icons";
 import { useT } from "./i18n-provider";
+import { buttonPrimary, buttonQuiet } from "./button-styles";
 
 type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -104,12 +105,6 @@ export function SubmitButton({
     </button>
   );
 }
-
-export const buttonPrimary =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-brand px-5 text-base font-semibold text-white shadow-soft transition-[background-color,transform] duration-200 hover:bg-brand-2 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70";
-
-export const buttonQuiet =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-ink transition-colors duration-200 hover:bg-sunken disabled:cursor-wait disabled:opacity-60";
 
 function Spinner() {
   return (

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { register } from "@/app/actions/auth";
 import { useT } from "@/components/i18n-provider";
-import { Field, Notice, SubmitButton, buttonPrimary } from "@/components/ui";
-import { ClockIcon, LockIcon, PhoneIcon } from "@/components/icons";
+import { Field, Notice, SubmitButton } from "@/components/ui";
+import { buttonPrimary } from "@/components/button-styles";
+import { CheckIcon, ClockIcon, LockIcon, PhoneIcon } from "@/components/icons";
 
 export function RegisterForm() {
   const [state, action] = useActionState(register, undefined);
@@ -14,13 +15,16 @@ export function RegisterForm() {
   const v = state?.values;
   const e = state?.errors;
 
+  // Without a clan code the account is ready at once; with one it waits for the leader.
+  const ready = state?.kind === "ready";
+
   if (state?.success) {
     return (
       <div className="rounded-xl border border-line bg-surface p-6 shadow-soft" role="status">
-        <span className="flex size-11 items-center justify-center rounded-full bg-warn-wash text-warn">
-          <ClockIcon width={22} height={22} />
+        <span className={`flex size-11 items-center justify-center rounded-full ${ready ? "bg-ok-wash text-ok" : "bg-warn-wash text-warn"}`}>
+          {ready ? <CheckIcon width={22} height={22} /> : <ClockIcon width={22} height={22} />}
         </span>
-        <h2 className="mt-4 font-display text-2xl text-brand-deep">{r.successTitle}</h2>
+        <h2 className="mt-4 font-display text-2xl text-brand-deep">{ready ? r.readyTitle : r.successTitle}</h2>
         <p className="mt-2 leading-relaxed text-ink-soft">{state.success}</p>
         <Link href="/login" className={`${buttonPrimary} mt-6 w-full`}>
           {r.goToSignIn}
@@ -43,7 +47,7 @@ export function RegisterForm() {
         defaultValue={v?.clanCode}
         errors={e?.clanCode}
         className="[&_input]:uppercase [&_input]:tracking-[0.08em]"
-        required
+        optional
       />
 
       <Field label={r.fullName} name="fullName" autoComplete="name" defaultValue={v?.fullName} errors={e?.fullName} required />

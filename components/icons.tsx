@@ -110,6 +110,40 @@ export const ArrowRightIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const LinkIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.54 3.54 0 0 0-5-5l-1.2 1.2" />
+    <path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.54 3.54 0 0 0 5 5l1.2-1.2" />
+  </Icon>
+);
+
+export const ShareIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M12 15.5V4.25M8.25 7.5 12 3.75l3.75 3.75" />
+    <path d="M5.75 12.5v5.75a2 2 0 0 0 2 2h8.5a2 2 0 0 0 2-2V12.5" />
+  </Icon>
+);
+
+export const BellIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M6.25 9.75a5.75 5.75 0 0 1 11.5 0c0 3 .6 4.6 1.4 5.6.4.5 0 1.4-.7 1.4H5.55c-.7 0-1.1-.9-.7-1.4.8-1 1.4-2.6 1.4-5.6Z" />
+    <path d="M10 19.5a2.2 2.2 0 0 0 4 0" />
+  </Icon>
+);
+
+export const PencilIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4.75 19.25h3.5l9-9a2.47 2.47 0 0 0-3.5-3.5l-9 9v3.5Z" />
+    <path d="M13.5 7.5l3 3" />
+  </Icon>
+);
+
+export const HeartIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M12 19.5 4.75 12.4a4.3 4.3 0 0 1 0-6.2 4.5 4.5 0 0 1 6.3 0l.95.93.95-.93a4.5 4.5 0 0 1 6.3 0 4.3 4.3 0 0 1 0 6.2L12 19.5Z" />
+  </Icon>
+);
+
 export const UploadIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M12 15.5V4.25M7.5 8.5 12 4l4.5 4.5" />
@@ -143,5 +177,21 @@ export const PercentIcon =(p: SVGProps<SVGSVGElement>) => (
     <path d="M18.5 5.5l-13 13" />
     <circle cx="7" cy="7" r="2.25" />
     <circle cx="17" cy="17" r="2.25" />
+  </Icon>
+);
+
+export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4.75 6.5h14.5" />
+    <path d="M9.5 6.5V4.75h5V6.5" />
+    <path d="M6.75 6.5l.8 12.1a2 2 0 0 0 2 1.9h4.9a2 2 0 0 0 2-1.9l.8-12.1" />
+    <path d="M10.5 10.5v6M13.5 10.5v6" />
+  </Icon>
+);
+
+export const BanIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.25" />
+    <path d="M6.2 6.2l11.6 11.6" />
   </Icon>
 );

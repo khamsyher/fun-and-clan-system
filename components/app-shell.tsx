@@ -6,12 +6,26 @@ import type { CurrentUser } from "@/lib/dal";
 import { BrandName } from "./brand";
 import { LogoutIcon } from "./icons";
 import { LanguageSwitcher } from "./language-switcher";
+import { NotificationBell } from "./notification-bell";
+import { getLocale } from "@/lib/i18n/server";
+import { renderNotification } from "@/lib/notification-text";
+import { listNotifications, unreadCount } from "@/lib/notify";
 import { NavTabs, type NavItem } from "./nav-tabs";
 import type { Dictionary } from "@/lib/i18n/config";
 function navFor(user: CurrentUser, t: Dictionary): NavItem[] {
   const account = { href: "/account", label: t.nav.account };
+  // Donation requests are shared by every clan, so all three roles get the same tab.
+  const donations = { href: "/donations", label: t.nav.donations };
+  // A general user belongs to no clan, so donations is the only area they have.
+  if (user.role === "user") return [donations, account];
   if (user.role === "super_admin")
-    return [{ href: "/admin", label: t.nav.overview }, { href: "/admin/reports", label: t.nav.reports }, account];
+    return [
+      { href: "/admin", label: t.nav.overview },
+      { href: "/admin/users", label: t.nav.users },
+      { href: "/admin/reports", label: t.nav.reports },
+      donations,
+      account,
+    ];
   if (user.role === "clan_admin")
     return [
       { href: "/clan", label: t.nav.overview },
@@ -21,6 +35,7 @@ function navFor(user: CurrentUser, t: Dictionary): NavItem[] {
       { href: "/clan/fund", label: t.nav.fund },
       { href: "/clan/reports", label: t.nav.reports },
       { href: "/clan/settings", label: t.nav.settings },
+      donations,
       account,
     ];
   return [
@@ -29,12 +44,13 @@ function navFor(user: CurrentUser, t: Dictionary): NavItem[] {
     { href: "/member/payments", label: t.nav.payments },
     { href: "/member/family", label: t.nav.family },
     ...(user.isTreasurer ? [{ href: "/member/approvals", label: t.nav.approvals }] : []),
+    donations,
     account,
   ];
 }
 
 export async function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
-  const t = await getT();
+  const [t, locale, recent, unread] = await Promise.all([getT(), getLocale(), listNotifications(user.id, 8), unreadCount(user.id)]);
   const initials = user.fullName
     .split(/\s+/)
     .slice(0, 2)
@@ -60,6 +76,7 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
             <div className="hidden sm:block">
               <LanguageSwitcher />
             </div>
+            <NotificationBell items={recent.map((n) => renderNotification(n, t, locale))} unread={unread} />
             <div className="hidden text-right leading-tight lg:block">
               <p className="text-sm font-medium text-ink">{user.fullName}</p>
               <p className="text-xs text-muted">{t.roles[user.role]}</p>

@@ -6,12 +6,13 @@ import { useT } from "@/components/i18n-provider";
 import { Field, Notice, SubmitButton } from "@/components/ui";
 import { LockIcon, PhoneIcon } from "@/components/icons";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, action] = useActionState(login, undefined);
   const t = useT();
 
   return (
     <form action={action} className="space-y-5" noValidate>
+      {next && <input type="hidden" name="next" value={next} />}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       <Field
         label={t.login.phone}
