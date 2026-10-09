@@ -3,11 +3,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeading, Section } from "@/components/app-shell";
 import { Pill, StatusBadge } from "@/components/badge";
+import { DocumentList } from "@/components/document-list";
+import { KycBadge, overallKyc } from "@/components/kyc-status";
+import { ProfileFacts } from "@/components/profile-facts";
 import { ResetPasswordButton } from "@/components/reset-password";
 import { requireRole } from "@/lib/dal";
 import { formatDate, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
+import { getProfile, listDocuments } from "@/lib/profile";
 import { getUser, userHistory } from "@/lib/users";
 import { BlockButton, DeleteButton } from "../user-actions";
 
@@ -23,7 +27,7 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
   const u = t.users;
   const person = await getUser(id);
   if (!person) notFound();
-  const history = await userHistory(person.id);
+  const [history, profile, documents] = await Promise.all([userHistory(person.id), getProfile(person.id), listDocuments(person.id)]);
   const protectedAccount = person.role === "super_admin";
 
   return (
@@ -37,6 +41,7 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <StatusBadge status={person.status} />
             {person.is_treasurer && <Pill tone="info">{t.treasurer.badge}</Pill>}
+            <KycBadge state={overallKyc(documents)} t={t} />
           </div>
         </PageHeading>
       </div>
@@ -44,9 +49,6 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="min-w-0 space-y-6">
           <dl className="grid gap-x-8 gap-y-4 rounded-xl border border-line bg-surface p-5 text-sm sm:grid-cols-2 sm:p-6">
-            <Fact label={t.clan.colPhone} value={person.phone} tabular />
-            <Fact label={t.register.email} value={person.email} />
-            <Fact label={t.register.village} value={person.village} />
             <Fact label={t.admin.colRole} value={t.roles[person.role]} />
             <Fact
               label={t.member.clan}
@@ -68,6 +70,13 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
             />
             {person.deceased_at && <Fact label={u.deceased} value={formatDate(person.deceased_at, locale)} />}
           </dl>
+
+          {profile && <ProfileFacts p={profile} t={t} locale={locale} stacked />}
+
+          <Section title={t.profile.documents} aside={t.kyc.youDecide}>
+            {/* The platform owner is the reviewer, so they see the number and the scan. */}
+            <DocumentList docs={documents} t={t} locale={locale} canOpenFile canReview emptyText={t.profile.noDocumentsMember} />
+          </Section>
 
           <Section title={u.activity}>
             <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-5">

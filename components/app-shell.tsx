@@ -10,47 +10,17 @@ import { NotificationBell } from "./notification-bell";
 import { getLocale } from "@/lib/i18n/server";
 import { renderNotification } from "@/lib/notification-text";
 import { listNotifications, unreadCount } from "@/lib/notify";
-import { NavTabs, type NavItem } from "./nav-tabs";
-import type { Dictionary } from "@/lib/i18n/config";
-function navFor(user: CurrentUser, t: Dictionary): NavItem[] {
-  const account = { href: "/account", label: t.nav.account };
-  // Donation requests are shared by every clan, so all three roles get the same tab.
-  const donations = { href: "/donations", label: t.nav.donations };
-  // A general user belongs to no clan, so donations is the only area they have.
-  if (user.role === "user") return [donations, account];
-  if (user.role === "super_admin")
-    return [
-      { href: "/admin", label: t.nav.overview },
-      { href: "/admin/users", label: t.nav.users },
-      { href: "/admin/reports", label: t.nav.reports },
-      donations,
-      account,
-    ];
-  if (user.role === "clan_admin")
-    return [
-      { href: "/clan", label: t.nav.overview },
-      { href: "/clan/events", label: t.nav.events },
-      { href: "/clan/slips", label: t.nav.slips },
-      ...(user.clanFundMode === "A" ? [{ href: "/clan/contributions", label: t.nav.contributions }] : []),
-      { href: "/clan/fund", label: t.nav.fund },
-      { href: "/clan/reports", label: t.nav.reports },
-      { href: "/clan/settings", label: t.nav.settings },
-      donations,
-      account,
-    ];
-  return [
-    { href: "/member", label: t.nav.overview },
-    { href: "/member/events", label: t.nav.events },
-    { href: "/member/payments", label: t.nav.payments },
-    { href: "/member/family", label: t.nav.family },
-    ...(user.isTreasurer ? [{ href: "/member/approvals", label: t.nav.approvals }] : []),
-    donations,
-    account,
-  ];
-}
-
+import { countPendingKyc } from "@/lib/kyc";
+import { AreaNav } from "./area-nav";
+import { areasFor } from "@/lib/navigation";
 export async function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
-  const [t, locale, recent, unread] = await Promise.all([getT(), getLocale(), listNotifications(user.id, 8), unreadCount(user.id)]);
+  const [t, locale, recent, unread, kycWaiting] = await Promise.all([
+    getT(),
+    getLocale(),
+    listNotifications(user.id, 8),
+    unreadCount(user.id),
+    user.role === "super_admin" ? countPendingKyc() : 0,
+  ]);
   const initials = user.fullName
     .split(/\s+/)
     .slice(0, 2)
@@ -77,16 +47,24 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
               <LanguageSwitcher />
             </div>
             <NotificationBell items={recent.map((n) => renderNotification(n, t, locale))} unread={unread} />
-            <div className="hidden text-right leading-tight lg:block">
-              <p className="text-sm font-medium text-ink">{user.fullName}</p>
-              <p className="text-xs text-muted">{t.roles[user.role]}</p>
-            </div>
-            <Link
-              href="/account"
-              aria-label={t.nav.account}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-white ring-2 ring-gold/40 ring-offset-2 ring-offset-paper transition-transform hover:scale-105"
-            >
-              {initials}
+            {/* Account left the tabs when they became feature areas, so the whole name block leads there. */}
+            <Link href="/account" aria-label={t.nav.account} className="group flex items-center gap-3 rounded-full">
+              <span className="hidden text-right leading-tight lg:block">
+                <span className="block text-sm font-medium text-ink">{user.fullName}</span>
+                <span className="block text-xs text-muted group-hover:text-brand">{t.nav.account}</span>
+              </span>
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ring-2 ring-gold/40 ring-offset-2 ring-offset-paper transition-transform group-hover:scale-105 ${
+                  user.photoFileId ? "bg-sunken" : "bg-brand text-white"
+                }`}
+              >
+                {user.photoFileId ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- private upload, served with an auth check
+                  <img src={`/files/${user.photoFileId}`} alt="" className="size-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </span>
             </Link>
             <form action={logout}>
               <button
@@ -100,7 +78,7 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
           </div>
         </div>
         <div className="mx-auto max-w-6xl px-2 sm:px-4">
-          <NavTabs items={navFor(user, t)} />
+          <AreaNav areas={areasFor(user, t, { kycWaiting })} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>

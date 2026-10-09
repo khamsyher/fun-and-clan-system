@@ -26,7 +26,11 @@ export type NotificationType =
   | "treasurer_assigned"
   | "join_requested"
   | "join_approved"
-  | "join_rejected";
+  | "join_rejected"
+  | "kyc_submitted"
+  | "kyc_approved"
+  | "kyc_rejected"
+  | "kyc_revoked";
 
 type Params = Record<string, string | number>;
 type Db = Pick<PoolClient, "query">;
@@ -70,6 +74,12 @@ export async function clanTreasurerIds(db: Db, clanId: string) {
     `SELECT id FROM users WHERE clan_id = $1 AND role = 'member' AND status = 'active' AND is_treasurer`,
     [clanId],
   );
+  return r.rows.map((x) => x.id);
+}
+
+/** The platform owners, who review identity documents. */
+export async function superAdminIds(db: Db) {
+  const r = await db.query<{ id: string }>(`SELECT id FROM users WHERE role = 'super_admin' AND status = 'active'`);
   return r.rows.map((x) => x.id);
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { query, queryOne, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
+import { canJoinClan } from "@/lib/access";
 import { clanLeaderId, notify } from "@/lib/notify";
 import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
@@ -19,6 +20,8 @@ export async function requestJoinClan(_state: FormState, formData: FormData): Pr
   const me = await requireRole("user");
   const t = await getT();
   const values = { clanCode: String(formData.get("clanCode") ?? "") };
+  // A clan takes on a real person, so the platform checks who they are first.
+  if (!canJoinClan(me)) return { message: t.kyc.needForClan, values };
   const parsed = clanCodeSchema(t.errors).safeParse(values);
   if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors, values };
 

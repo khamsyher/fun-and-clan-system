@@ -187,7 +187,9 @@ export default async function ClanPage() {
                   <tr key={m.id}>
                     <td className="px-4 py-3.5">
                       <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
-                        {m.full_name}
+                        <Link href={`/clan/members/${m.id}`} className="text-brand hover:text-brand-bright">
+                          {m.full_name}
+                        </Link>
                         {m.is_treasurer && <Pill tone="info">{t.treasurer.badge}</Pill>}
                       </p>
                       {m.village && <p className="text-xs text-muted">{m.village}</p>}

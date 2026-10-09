@@ -3,7 +3,6 @@ import Link from "next/link";
 import { PageHeading } from "@/components/app-shell";
 import { Pill, StatusBadge } from "@/components/badge";
 import { ArrowRightIcon } from "@/components/icons";
-import { ResetPasswordButton } from "@/components/reset-password";
 import { Notice } from "@/components/ui";
 import { requireRole } from "@/lib/dal";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -148,16 +147,16 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
                           {(p.status === "active" || p.status === "disabled") && (
                             <BlockButton userId={p.id} name={p.full_name} blocked={p.status === "disabled"} />
                           )}
-                          <ResetPasswordButton userId={p.id} name={p.full_name} />
                           <DeleteButton userId={p.id} name={p.full_name} />
                         </>
                       )}
+                      {/* Everything about one person, and the rest of the actions, live on their page. */}
                       <Link
                         href={`/admin/users/${p.id}`}
-                        aria-label={fmt(u.openProfile, { name: p.full_name })}
-                        className="rounded-md p-1.5 text-ink-soft hover:bg-sunken hover:text-ink"
+                        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-brand hover:bg-brand-wash"
                       >
                         <ArrowRightIcon width={16} height={16} />
+                        {u.viewDetails}
                       </Link>
                     </div>
                   </td>

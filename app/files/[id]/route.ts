@@ -6,6 +6,8 @@ import { queryOne } from "@/lib/db";
  * Serves an uploaded file. Who may see what:
  *  - donation photos and QR codes: every signed-in user (donation requests are cross-clan)
  *  - donation slips: the donor who uploaded it and the person who asked for the donation
+ *  - profile photos: the person themself, anyone in their clan, and the platform owner
+ *  - identity documents (KYC): the person themself, their clan leader, and the platform owner who approves them
  *  - transfer slips: the member who uploaded it and their clan leader
  *  - everything else (meeting minutes, payout proofs): signed-in users of the same clan
  * Anything not allowed answers 404, so ids can't be probed.
@@ -59,6 +61,19 @@ async function canRead(
       [fileId, user.id],
     );
     return Boolean(owner);
+  }
+
+  // A profile photo is shown beside someone's name inside their own clan.
+  if (file.purpose === "profile_photo") {
+    if (file.uploaded_by === user.id || user.role === "super_admin") return true;
+    return Boolean(file.clan_id) && file.clan_id === user.clanId;
+  }
+
+  // An identity document is seen by the person, the platform owner who decides on it,
+  // and the leader of the clan they belong to.
+  if (file.purpose === "kyc_document") {
+    if (file.uploaded_by === user.id || user.role === "super_admin") return true;
+    return user.role === "clan_admin" && Boolean(file.clan_id) && file.clan_id === user.clanId;
   }
 
   // An upload with no clan came from a general user; only they can open it.

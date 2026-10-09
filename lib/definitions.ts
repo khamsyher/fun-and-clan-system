@@ -27,6 +27,13 @@ export const DONOR_ROLES: Role[] = ["member", "clan_admin", "user"];
 export const RELATIONSHIPS = ["spouse", "child", "father", "mother"] as const;
 export type Relationship = (typeof RELATIONSHIPS)[number];
 
+export const GENDERS = ["female", "male", "other"] as const;
+export type Gender = (typeof GENDERS)[number];
+
+/** Identity documents a clan leader may be shown. */
+export const DOCUMENT_TYPES = ["national_id", "family_book", "passport", "driving_licence", "other"] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
 type Errors = Dictionary["errors"];
 
 const phone = (e: Errors) =>
@@ -75,6 +82,78 @@ export const registerSchema = (e: Errors) =>
     .refine((d) => d.password === d.confirmPassword, {
       path: ["confirmPassword"],
       error: e.passwordsMismatch,
+    });
+
+/** A date someone could have been born on: a real date, in the past, within living memory. */
+function isBirthDate(value: string) {
+  if (!isPlainDate(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return date.getTime() < Date.now() && date.getUTCFullYear() > 1900;
+}
+
+function isPlainDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+const optionalPhone = (e: Errors) =>
+  optionalText.pipe(
+    z
+      .string()
+      .transform((v) => v.replace(/[\s-]/g, ""))
+      .pipe(z.string().regex(/^\+?[0-9]{8,15}$/, { error: e.phoneInvalid }))
+      .nullable(),
+  );
+
+const optionalLine = (max: number) => optionalText.pipe(z.string().max(max).nullable());
+
+const optionalDate = (e: Errors) =>
+  optionalText.pipe(
+    z
+      .string()
+      .nullable()
+      .refine((v) => v === null || isPlainDate(v), { error: e.dateInvalid }),
+  );
+
+/** Someone's own details. Every field is optional: an account works with none of them filled in. */
+export const profileSchema = (e: Errors) =>
+  z.object({
+    firstName: optionalLine(80),
+    lastName: optionalLine(80),
+    dateOfBirth: optionalText.pipe(
+      z
+        .string()
+        .nullable()
+        .refine((v) => v === null || isBirthDate(v), { error: e.birthInvalid }),
+    ),
+    // An unknown value simply means "not said", rather than failing the whole form.
+    gender: z
+      .string()
+      .trim()
+      .transform((v) => (GENDERS.includes(v as Gender) ? (v as Gender) : null)),
+    email: optionalText.pipe(z.email({ error: e.emailInvalid }).nullable()),
+    whatsapp: optionalPhone(e),
+    facebook: optionalLine(150),
+    tiktok: optionalLine(150),
+    village: optionalLine(100),
+    district: optionalLine(100),
+    province: optionalLine(100),
+  });
+
+/** One identity document. The scan itself is checked separately, as an upload. */
+export const documentSchema = (e: Errors) =>
+  z
+    .object({
+      docType: z.enum(DOCUMENT_TYPES, { error: e.docTypeRequired }),
+      docNumber: z.string().trim().min(2, { error: e.docNumberRequired }).max(60),
+      issuedOn: optionalDate(e),
+      expiresOn: optionalDate(e),
+      note: optionalLine(200),
+    })
+    .refine((d) => !d.issuedOn || !d.expiresOn || d.expiresOn >= d.issuedOn, {
+      path: ["expiresOn"],
+      error: e.expiryBeforeIssue,
     });
 
 /** Just a clan code, used when a general user asks to join a clan. */

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { query, queryOne, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
+import { canAskForHelp } from "@/lib/access";
 import { readUpload, type UploadCheck } from "@/lib/files";
 import { isPastDate, parseKip, UUID_RE } from "@/lib/funds";
 import { clanMemberIds, direct, notify, notifyMany } from "@/lib/notify";
@@ -76,7 +77,10 @@ async function readRequestForm(formData: FormData, t: Dict, keepsPayment = false
 /** A member or clan leader asks for help. It is published to every clan straight away. */
 export async function createRequest(_state: FormState, formData: FormData): Promise<FormState> {
   const me = await requireRole(...DONOR_ROLES);
-  const t = (await getT()).donations;
+  const tt = await getT();
+  const t = tt.donations;
+  // Money is sent to whoever asks, so only someone the platform has identified may ask.
+  if (!canAskForHelp(me)) return { message: tt.kyc.needForRequest };
 
   const form = await readRequestForm(formData, t);
   const { values, photo, qr } = form;

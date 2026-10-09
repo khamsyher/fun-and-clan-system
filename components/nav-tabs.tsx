@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavItem = { href: string; label: string };
+export type NavItem = { href: string; label: string; /** Shown as a count beside the label when it is above zero. */ badge?: number };
 
 export function NavTabs({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -26,6 +26,11 @@ export function NavTabs({ items }: { items: NavItem[] }) {
             }`}
           >
             {item.label}
+            {Boolean(item.badge) && (
+              <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-warn-wash px-1.5 py-0.5 text-xs font-semibold text-warn">
+                {item.badge}
+              </span>
+            )}
           </Link>
         );
       })}

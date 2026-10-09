@@ -195,3 +195,10 @@ export const BanIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M6.2 6.2l11.6 11.6" />
   </Icon>
 );
+
+/** The same shield as ShieldIcon without the tick: an identity not confirmed yet. */
+export const ShieldBlankIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M12 3 4.75 5.75v5.5c0 4.6 3 8.3 7.25 9.75 4.25-1.45 7.25-5.15 7.25-9.75v-5.5L12 3Z" />
+  </Icon>
+);

@@ -597,3 +597,67 @@ CREATE TABLE IF NOT EXISTS clan_join_requests (
 -- One request at a time per person, so nobody can queue up at every clan at once.
 CREATE UNIQUE INDEX IF NOT EXISTS clan_join_requests_one_pending ON clan_join_requests (user_id) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS clan_join_requests_clan_idx ON clan_join_requests (clan_id, status, created_at DESC);
+
+-- ===========================================================================
+-- Fuller profiles: who someone is, how to reach them, and the identity
+-- documents their clan leader checks. Additive and re-runnable.
+-- ===========================================================================
+DO $$ BEGIN
+  CREATE TYPE gender AS ENUM ('female', 'male', 'other');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- full_name stays the name the app displays; first/last are kept separately and
+-- rewrite full_name whenever both are given.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name    VARCHAR(80);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name     VARCHAR(80);
+-- Age is never stored: it is worked out from the date of birth, so it can't go stale.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender        gender;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_file_id UUID REFERENCES files(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS district      VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS province      VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp      VARCHAR(30);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS facebook      VARCHAR(150);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tiktok        VARCHAR(150);
+
+DO $$ BEGIN
+  CREATE TYPE id_document AS ENUM ('national_id', 'family_book', 'passport', 'driving_licence', 'other');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- Identity documents (KYC). Someone records their own; their clan leader is the
+-- one who confirms the document was seen. Nobody else can read the scan.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_documents (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  doc_type    id_document NOT NULL,
+  doc_number  VARCHAR(60) NOT NULL,
+  issued_on   DATE,
+  expires_on  DATE,
+  file_id     UUID REFERENCES files(id) ON DELETE RESTRICT, -- photo or PDF of the document
+  note        VARCHAR(200),
+  verified_at TIMESTAMPTZ,
+  verified_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT user_documents_dates CHECK (expires_on IS NULL OR issued_on IS NULL OR expires_on >= issued_on)
+);
+CREATE INDEX IF NOT EXISTS user_documents_user_idx ON user_documents (user_id, created_at DESC);
+-- The same document is only recorded once per person.
+CREATE UNIQUE INDEX IF NOT EXISTS user_documents_once ON user_documents (user_id, doc_type, doc_number);
+
+-- ===========================================================================
+-- KYC review: the platform owner (super admin) decides on identity documents,
+-- and an approved document is what opens up joining a clan and asking for
+-- donations. Additive and re-runnable.
+-- ===========================================================================
+DO $$ BEGIN
+  CREATE TYPE kyc_status AS ENUM ('pending', 'approved', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS status      kyc_status NOT NULL DEFAULT 'pending';
+ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS review_note VARCHAR(300); -- why it was turned down
+-- verified_at / verified_by now record the decision, whichever way it went.
+UPDATE user_documents SET status = 'approved' WHERE verified_at IS NOT NULL AND status = 'pending';
+
+CREATE INDEX IF NOT EXISTS user_documents_queue_idx ON user_documents (status, created_at);

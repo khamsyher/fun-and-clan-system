@@ -67,6 +67,16 @@ async function seedDemo(client: Client) {
      VALUES (NULL, 'user', 'active', 'Bee Lor', '02085555555', $1) ON CONFLICT (phone) DO NOTHING`,
     [pw],
   );
+  // The demo accounts come identity-checked, since joining a clan and asking for
+  // donations both need an approved document.
+  await client.query(
+    `INSERT INTO user_documents (user_id, doc_type, doc_number, status, verified_at, verified_by)
+     SELECT u.id, 'national_id', 'DEMO-' || right(u.phone, 4), 'approved', now(),
+            (SELECT id FROM users WHERE role = 'super_admin' ORDER BY created_at LIMIT 1)
+       FROM users u
+      WHERE u.phone IN ('02011111111', '02022222222', '02085555555')
+     ON CONFLICT (user_id, doc_type, doc_number) DO NOTHING`,
+  );
   console.log("✓ Demo clan VANG01 seeded (all demo passwords: Password123)");
   console.log("    leader 02011111111 · member 02022222222 · pending 02033333333, 02044444444");
   console.log("    general user (no clan) 02085555555");

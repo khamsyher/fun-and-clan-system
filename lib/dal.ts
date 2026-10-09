@@ -19,6 +19,9 @@ export type CurrentUser = {
   sessionVersion: number;
   isTreasurer: boolean;
   clanFundMode: "A" | "B" | null;
+  photoFileId: string | null;
+  /** True once the platform owner has approved one of their identity documents. */
+  kycApproved: boolean;
 };
 
 /**
@@ -33,7 +36,9 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     `SELECT u.id, u.role, u.status, u.full_name AS "fullName", u.phone, u.email,
             u.clan_id AS "clanId", c.name AS "clanName", c.code AS "clanCode",
             c.is_active AS "clanActive", u.session_version AS "sessionVersion",
-            u.is_treasurer AS "isTreasurer", c.fund_mode AS "clanFundMode"
+            u.is_treasurer AS "isTreasurer", c.fund_mode AS "clanFundMode",
+            u.photo_file_id AS "photoFileId",
+            EXISTS (SELECT 1 FROM user_documents d WHERE d.user_id = u.id AND d.status = 'approved') AS "kycApproved"
        FROM users u
        LEFT JOIN clans c ON c.id = u.clan_id
       WHERE u.id = $1`,
