@@ -2,9 +2,10 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { deleteUser, setUserBlocked } from "@/app/actions/users";
+import { deleteUser, setClanLeader, setSupport, setUserBlocked } from "@/app/actions/users";
 import { useT } from "@/components/i18n-provider";
 import { BanIcon, CheckIcon, TrashIcon } from "@/components/icons";
+import type { Role } from "@/lib/definitions";
 import { fmt } from "@/lib/i18n/config";
 
 const quiet = "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap";
@@ -87,6 +88,140 @@ export function DeleteButton({ userId, name }: { userId: string; name: string })
       <Submit className="rounded-md bg-bad px-2.5 py-1 text-sm font-semibold text-white hover:opacity-90" pending={t.working}>
         {t.deleteYes}
       </Submit>
+    </form>
+  );
+}
+
+/**
+ * Makes this person a clan leader, or steps a leader back down to member. A member leads
+ * their own clan; a general user has none yet, so the admin picks one from the list.
+ */
+export function LeaderControl({
+  userId,
+  name,
+  role,
+  clanName,
+  clans,
+}: {
+  userId: string;
+  name: string;
+  role: Role;
+  clanName: string | null;
+  clans: { id: string; name: string; code: string }[];
+}) {
+  const [state, action] = useActionState(setClanLeader, undefined);
+  const [confirming, setConfirming] = useState(false);
+  const t = useT().users;
+  const isLeader = role === "clan_admin";
+  const needsClan = role === "user";
+
+  if (state?.success) {
+    return (
+      <p className="rounded-lg bg-ok-wash px-3 py-2 text-sm text-ok" role="status">
+        {state.success}
+      </p>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className={`${quiet} ${isLeader ? "text-ink-soft hover:bg-sunken hover:text-ink" : "text-brand hover:bg-sunken"}`}
+        >
+          {isLeader ? t.leaderRemove : t.leaderMake}
+        </button>
+      ) : (
+        <form action={action} className="flex flex-col gap-2 rounded-lg border border-line p-3">
+          <input type="hidden" name="userId" value={userId} />
+          <input type="hidden" name="leader" value={isLeader ? "false" : "true"} />
+          {needsClan ? (
+            <label className="flex flex-col gap-1 text-xs text-ink-soft">
+              {t.leaderClan}
+              <select name="clanId" required defaultValue="" className="h-9 rounded-md border border-line-strong bg-surface px-2 text-sm text-ink">
+                <option value="" disabled>
+                  {t.leaderPickClan}
+                </option>
+                {clans.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <span className="text-xs text-ink-soft">
+            {isLeader
+              ? fmt(t.leaderRemoveConfirm, { name })
+              : needsClan
+                ? fmt(t.leaderMakeConfirmPick, { name })
+                : fmt(t.leaderMakeConfirm, { name, clan: clanName ?? "" })}
+          </span>
+          {(state?.message || state?.errors?.clanId) && (
+            <p className="text-xs text-bad" role="alert">
+              {state.message ?? state.errors?.clanId?.[0]}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setConfirming(false)} className="rounded-md px-2 py-1 text-sm text-ink-soft hover:bg-sunken">
+              {t.cancel}
+            </button>
+            <Submit className="rounded-md bg-brand px-2.5 py-1 text-sm font-semibold text-white hover:opacity-90" pending={t.working}>
+              {isLeader ? t.leaderRemoveYes : t.leaderMakeYes}
+            </Submit>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/** The super admin gives a general user the support role, or takes it back. Asks first either way. */
+export function SupportControl({ userId, name, isSupport }: { userId: string; name: string; isSupport: boolean }) {
+  const [state, action] = useActionState(setSupport, undefined);
+  const [confirming, setConfirming] = useState(false);
+  const t = useT().users;
+
+  if (state?.success) {
+    return (
+      <p className="rounded-lg bg-ok-wash px-3 py-2 text-sm text-ok" role="status">
+        {state.success}
+      </p>
+    );
+  }
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className={`${quiet} ${isSupport ? "text-ink-soft hover:bg-sunken hover:text-ink" : "text-brand hover:bg-sunken"}`}
+      >
+        {isSupport ? t.supportRemove : t.supportMake}
+      </button>
+    );
+  }
+
+  return (
+    <form action={action} className="flex w-full flex-col gap-2 rounded-lg border border-line p-3">
+      <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="support" value={isSupport ? "false" : "true"} />
+      <span className="text-xs text-ink-soft">{fmt(isSupport ? t.supportRemoveConfirm : t.supportMakeConfirm, { name })}</span>
+      {state?.message && (
+        <p className="text-xs text-bad" role="alert">
+          {state.message}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setConfirming(false)} className="rounded-md px-2 py-1 text-sm text-ink-soft hover:bg-sunken">
+          {t.cancel}
+        </button>
+        <Submit className="rounded-md bg-brand px-2.5 py-1 text-sm font-semibold text-white hover:opacity-90" pending={t.working}>
+          {isSupport ? t.supportRemoveYes : t.supportMakeYes}
+        </Submit>
+      </div>
     </form>
   );
 }

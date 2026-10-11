@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/dal";
 import { queryOne } from "@/lib/db";
+import { isStaffRole, type Role } from "@/lib/definitions";
 
 /**
  * Serves an uploaded file. Who may see what:
@@ -48,7 +49,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/files/[id]">) {
 async function canRead(
   fileId: string,
   file: { purpose: string; uploaded_by: string | null; clan_id: string | null },
-  user: { id: string; role: string; clanId: string | null },
+  user: { id: string; role: Role; clanId: string | null },
 ) {
   if (file.purpose === "donation_photo" || file.purpose === "donation_qr") return true;
 
@@ -65,14 +66,14 @@ async function canRead(
 
   // A profile photo is shown beside someone's name inside their own clan.
   if (file.purpose === "profile_photo") {
-    if (file.uploaded_by === user.id || user.role === "super_admin") return true;
+    if (file.uploaded_by === user.id || isStaffRole(user.role)) return true;
     return Boolean(file.clan_id) && file.clan_id === user.clanId;
   }
 
   // An identity document is seen by the person, the platform owner who decides on it,
   // and the leader of the clan they belong to.
   if (file.purpose === "kyc_document") {
-    if (file.uploaded_by === user.id || user.role === "super_admin") return true;
+    if (file.uploaded_by === user.id || isStaffRole(user.role)) return true;
     return user.role === "clan_admin" && Boolean(file.clan_id) && file.clan_id === user.clanId;
   }
 

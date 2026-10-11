@@ -7,13 +7,16 @@ import { DocumentList } from "@/components/document-list";
 import { KycBadge, overallKyc } from "@/components/kyc-status";
 import { ProfileFacts } from "@/components/profile-facts";
 import { ResetPasswordButton } from "@/components/reset-password";
+import { query } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
+import { canManageAccount, canResetPasswords } from "@/lib/access";
+import { STAFF_ROLES, isStaffRole } from "@/lib/definitions";
 import { formatDate, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { getProfile, listDocuments } from "@/lib/profile";
 import { getUser, userHistory } from "@/lib/users";
-import { BlockButton, DeleteButton } from "../user-actions";
+import { BlockButton, DeleteButton, LeaderControl, SupportControl } from "../user-actions";
 
 export async function generateMetadata({ params }: PageProps<"/admin/users/[id]">): Promise<Metadata> {
   const [{ id }, t] = await Promise.all([params, getT()]);
@@ -22,13 +25,22 @@ export async function generateMetadata({ params }: PageProps<"/admin/users/[id]"
 }
 
 export default async function AdminUserPage({ params }: PageProps<"/admin/users/[id]">) {
-  await requireRole("super_admin");
+  const me = await requireRole(...STAFF_ROLES);
   const [{ id }, t, locale] = await Promise.all([params, getT(), getLocale()]);
   const u = t.users;
   const person = await getUser(id);
   if (!person) notFound();
   const [history, profile, documents] = await Promise.all([userHistory(person.id), getProfile(person.id), listDocuments(person.id)]);
-  const protectedAccount = person.role === "super_admin";
+  // A super admin is never managed from here; a support account only by the super admin.
+  const protectedAccount = !canManageAccount(me, person.role);
+  const staffTarget = isStaffRole(person.role);
+  // Only a person with no clan can be made support, and only the super admin decides it.
+  const showSupport = me.role === "super_admin" && (person.role === "user" || person.role === "support") && person.status !== "disabled";
+  // A general user has no clan yet, so the admin picks which one they will lead.
+  const clans =
+    person.role === "user"
+      ? await query<{ id: string; name: string; code: string }>(`SELECT id, name, code FROM clans WHERE is_active ORDER BY name`)
+      : [];
 
   return (
     <>
@@ -112,7 +124,7 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
         <div className="h-fit rounded-xl border border-line bg-surface p-5 sm:p-6">
           <h2 className="font-display text-xl text-brand-deep">{u.manage}</h2>
           {protectedAccount ? (
-            <p className="mt-2 text-sm text-ink-soft">{u.protectedBody}</p>
+            <p className="mt-2 text-sm text-ink-soft">{person.role === "super_admin" ? u.protectedBody : u.staffOnlySuperAdmin}</p>
           ) : (
             <>
               <p className="mt-2 text-sm text-ink-soft">{u.manageBody}</p>
@@ -120,10 +132,33 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
                 {(person.status === "active" || person.status === "disabled") && (
                   <BlockButton userId={person.id} name={person.full_name} blocked={person.status === "disabled"} />
                 )}
-                <ResetPasswordButton userId={person.id} name={person.full_name} />
+                {/* Support can do everything here except hand out a password. */}
+                {canResetPasswords(me) && <ResetPasswordButton userId={person.id} name={person.full_name} />}
                 <DeleteButton userId={person.id} name={person.full_name} />
               </div>
               <p className="mt-4 border-t border-line pt-4 text-xs text-muted">{u.deleteNote}</p>
+
+              {showSupport && (
+                <div className="mt-4 border-t border-line pt-4">
+                  <h3 className="text-sm font-semibold text-ink">{u.supportTitle}</h3>
+                  <p className="mt-1 mb-3 text-xs text-ink-soft">{person.role === "support" ? u.supportBodyIs : u.supportBody}</p>
+                  <SupportControl userId={person.id} name={person.full_name} isSupport={person.role === "support"} />
+                </div>
+              )}
+
+              {!staffTarget && person.status !== "disabled" && (
+                <div className="mt-4 border-t border-line pt-4">
+                  <h3 className="text-sm font-semibold text-ink">{u.leaderTitle}</h3>
+                  <p className="mt-1 mb-3 text-xs text-ink-soft">{person.role === "clan_admin" ? u.leaderBodyIs : u.leaderBody}</p>
+                  <LeaderControl
+                    userId={person.id}
+                    name={person.full_name}
+                    role={person.role}
+                    clanName={person.clan_name}
+                    clans={clans}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>

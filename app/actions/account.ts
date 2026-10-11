@@ -1,11 +1,10 @@
 "use server";
 
-import { randomInt } from "node:crypto";
 import * as z from "zod";
 import { revalidatePath } from "next/cache";
 import { query, queryOne } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
-import { hashPassword, verifyPassword } from "@/lib/password";
+import { hashPassword, temporaryPassword, verifyPassword } from "@/lib/password";
 import { createSession } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import type { FormState } from "@/lib/definitions";
@@ -90,12 +89,4 @@ export async function resetPassword(_state: FormState, formData: FormData): Prom
     revalidatePath(`/admin/users/${userId}`);
   }
   return { success: temp, values: { name: target.full_name } };
-}
-
-/** e.g. "KTRW-4827": easy to read out loud, meets the password rules, no look-alike characters. */
-function temporaryPassword() {
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const word = Array.from({ length: 4 }, () => letters[randomInt(letters.length)]).join("");
-  const digits = String(randomInt(1000, 10000));
-  return `${word}-${digits}`;
 }

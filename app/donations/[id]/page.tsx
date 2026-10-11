@@ -7,6 +7,7 @@ import { DonationProgress } from "@/components/donation-progress";
 import { FileIcon } from "@/components/icons";
 import { Notice } from "@/components/ui";
 import { requireRole } from "@/lib/dal";
+import { isStaffRole } from "@/lib/definitions";
 import { getRequest, listDonations } from "@/lib/donations";
 import { formatDate, formatKip } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
@@ -35,7 +36,7 @@ export default async function DonationRequestPage({ params, searchParams }: Page
   const pending = donations.filter((x) => x.status === "pending");
   const confirmed = donations.filter((x) => x.status === "confirmed");
   const myPending = pending.filter((x) => x.donor_id === me.id);
-  const canGive = !isOwner && request.status === "open" && me.role !== "super_admin";
+  const canGive = !isOwner && request.status === "open" && !isStaffRole(me.role);
 
   return (
     <>

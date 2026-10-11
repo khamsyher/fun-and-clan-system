@@ -3,6 +3,7 @@ import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { getT } from "@/lib/i18n/server";
 import type { CurrentUser } from "@/lib/dal";
+import { isStaffRole } from "@/lib/definitions";
 import { BrandName } from "./brand";
 import { LogoutIcon } from "./icons";
 import { LanguageSwitcher } from "./language-switcher";
@@ -19,7 +20,7 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
     getLocale(),
     listNotifications(user.id, 8),
     unreadCount(user.id),
-    user.role === "super_admin" ? countPendingKyc() : 0,
+    isStaffRole(user.role) ? countPendingKyc() : 0,
   ]);
   const initials = user.fullName
     .split(/\s+/)

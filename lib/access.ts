@@ -1,4 +1,5 @@
 import type { CurrentUser } from "./dal";
+import { isStaffRole, type Role } from "./definitions";
 
 /**
  * What a signed-in person may do, in one place.
@@ -9,9 +10,14 @@ import type { CurrentUser } from "./dal";
  * show, the action because the page can be bypassed.
  */
 
-/** Anyone who can take part in donations: everyone except the platform owner. */
+/** Platform staff: the super admin and support. */
+export function isStaff(user: CurrentUser) {
+  return isStaffRole(user.role);
+}
+
+/** Anyone who can take part in donations: everyone except platform staff. */
 export function isDonor(user: CurrentUser) {
-  return user.role !== "super_admin";
+  return !isStaff(user);
 }
 
 /**
@@ -29,5 +35,28 @@ export function canJoinClan(user: CurrentUser) {
 
 /** Identity decisions rest with the platform, never with the clan that benefits from them. */
 export function canReviewKyc(user: CurrentUser) {
+  return isStaff(user);
+}
+
+/**
+ * Handing out a temporary password lets someone into another person's account, so on the
+ * platform side it stays with the super admin alone — support can do everything else.
+ */
+export function canResetPasswords(user: CurrentUser) {
   return user.role === "super_admin";
+}
+
+/**
+ * Staff accounts are only managed by the super admin: support can't block, delete or change
+ * the role of a super admin or another support account. No one can touch a super admin.
+ */
+export function canManageAccount(actor: CurrentUser, targetRole: Role) {
+  if (targetRole === "super_admin") return false;
+  if (targetRole === "support") return actor.role === "super_admin";
+  return isStaff(actor);
+}
+
+/** Roles an actor may not act on, for use in SQL guards (`role::text <> ALL($n)`). */
+export function protectedRoles(actor: CurrentUser): Role[] {
+  return actor.role === "super_admin" ? ["super_admin"] : ["super_admin", "support"];
 }

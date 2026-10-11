@@ -1,7 +1,7 @@
 // Password hashing with Node's built-in scrypt (no native dependency).
 // Not marked server-only so the setup script can reuse it; it imports node:crypto,
 // so it can never end up in a client bundle anyway.
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 const scryptAsync = promisify(scrypt) as (
@@ -24,4 +24,12 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const expected = Buffer.from(keyHex, "hex");
   const actual = await scryptAsync(password, Buffer.from(saltHex, "hex"), expected.length);
   return timingSafeEqual(actual, expected);
+}
+
+/** e.g. "KTRW-4827": easy to read out loud, meets the password rules, no look-alike characters. */
+export function temporaryPassword() {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const word = Array.from({ length: 4 }, () => letters[randomInt(letters.length)]).join("");
+  const digits = String(randomInt(1000, 10000));
+  return `${word}-${digits}`;
 }

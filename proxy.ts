@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { decrypt, SESSION_COOKIE } from "@/lib/session";
-import { ROLE_HOME, type Role } from "@/lib/definitions";
+import { ROLE_HOME, STAFF_ROLES, type Role } from "@/lib/definitions";
 
 // Optimistic checks from the cookie only (no DB). Pages re-check against the
 // database through lib/dal.ts, which is the real security boundary.
-const ROLE_AREAS: { prefix: string; role: Role }[] = [
-  { prefix: "/admin", role: "super_admin" },
-  { prefix: "/clan", role: "clan_admin" },
-  { prefix: "/member", role: "member" },
+const ROLE_AREAS: { prefix: string; roles: Role[] }[] = [
+  { prefix: "/admin", roles: STAFF_ROLES },
+  { prefix: "/clan", roles: ["clan_admin"] },
+  { prefix: "/member", roles: ["member"] },
 ];
 const SIGNED_IN = ["/account", "/files", "/donations", "/notifications"];
 const GUEST_ONLY = ["/login", "/register"];
@@ -19,7 +19,7 @@ export default async function proxy(req: NextRequest) {
   const area = ROLE_AREAS.find((a) => path === a.prefix || path.startsWith(`${a.prefix}/`));
   if (area) {
     if (!session) return NextResponse.redirect(new URL("/login", req.nextUrl));
-    if (session.role !== area.role) {
+    if (!area.roles.includes(session.role)) {
       return NextResponse.redirect(new URL(ROLE_HOME[session.role], req.nextUrl));
     }
   }

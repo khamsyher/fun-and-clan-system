@@ -6,6 +6,7 @@ import { DonationProgress } from "@/components/donation-progress";
 import { HeartIcon } from "@/components/icons";
 import { buttonPrimary } from "@/components/button-styles";
 import { requireRole } from "@/lib/dal";
+import { isStaffRole } from "@/lib/definitions";
 import { listRequests, myDonations } from "@/lib/donations";
 import { formatDate, formatKip } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
@@ -23,7 +24,7 @@ export default async function DonationsPage() {
   return (
     <>
       <PageHeading title={d.title} lede={d.lede}>
-        {me.role !== "super_admin" && (
+        {!isStaffRole(me.role) && (
           <Link href="/donations/new" className={`${buttonPrimary} shrink-0`}>
             <HeartIcon width={18} height={18} />
             {d.create}

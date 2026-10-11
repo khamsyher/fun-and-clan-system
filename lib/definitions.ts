@@ -1,8 +1,15 @@
 import * as z from "zod";
 import type { Dictionary } from "./i18n/config";
 
-/** `user` is a general user: signed up without a clan code, so they only see donations. */
-export type Role = "super_admin" | "clan_admin" | "member" | "user";
+/**
+ * `user` is a general user: signed up without a clan code, so they only see donations.
+ * `support` is platform staff: everything the super admin does, except resetting passwords.
+ */
+export type Role = "super_admin" | "support" | "clan_admin" | "member" | "user";
+
+/** The people who run the platform, and share the /admin area. */
+export const STAFF_ROLES: Role[] = ["super_admin", "support"];
+export const isStaffRole = (role: Role) => STAFF_ROLES.includes(role);
 export type UserStatus = "pending" | "active" | "rejected" | "disabled";
 
 export type SessionPayload = {
@@ -16,6 +23,7 @@ export type SessionPayload = {
 
 export const ROLE_HOME: Record<Role, string> = {
   super_admin: "/admin",
+  support: "/admin",
   clan_admin: "/clan",
   member: "/member",
   user: "/donations",
@@ -75,7 +83,6 @@ export const registerSchema = (e: Errors) =>
       fullName: z.string().trim().min(2, { error: e.fullNameRequired }).max(150),
       phone: phone(e),
       email: optionalText.pipe(z.email({ error: e.emailInvalid }).nullable()),
-      village: optionalText,
       password: password(e),
       confirmPassword: z.string(),
     })
@@ -164,6 +171,19 @@ export const clanCodeSchema = (e: Errors) =>
       .trim()
       .toUpperCase()
       .regex(/^[A-Z0-9-]{2,20}$/, { error: e.clanCodeFormat }),
+  });
+
+/** Roles staff can give a new account. Support is further limited to the super admin, in the action. */
+export const CREATABLE_ROLES = ["user", "member", "clan_admin", "support"] as const;
+
+/** An account the platform staff create for someone. The password is generated, not typed. */
+export const adminCreateUserSchema = (e: Errors) =>
+  z.object({
+    fullName: z.string().trim().min(2, { error: e.fullNameRequired }).max(150),
+    phone: phone(e),
+    email: optionalText.pipe(z.email({ error: e.emailInvalid }).nullable()),
+    role: z.enum(CREATABLE_ROLES),
+    clanId: optionalText,
   });
 
 export const createClanSchema = (e: Errors) =>

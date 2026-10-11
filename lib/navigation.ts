@@ -1,5 +1,6 @@
 import type { NavArea } from "@/components/area-nav";
 import type { CurrentUser } from "./dal";
+import { isStaffRole } from "./definitions";
 import type { Dictionary } from "./i18n/config";
 
 /**
@@ -28,7 +29,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
   // A general user belongs to no clan, so donations is the only area they have.
   if (user.role === "user") return [donations];
 
-  if (user.role === "super_admin")
+  if (isStaffRole(user.role))
     return [
       {
         href: "/admin",
@@ -38,10 +39,13 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
         owns: [],
         sections: [
           { href: "/admin", label: t.nav.overview },
+          { href: "/admin/clans", label: t.clansAdmin.title },
+          { href: "/admin/fund", label: t.fundAdmin.title },
           { href: "/admin/users", label: t.nav.users },
           // The badge keeps the queue visible after the notification has been read.
           { href: "/admin/kyc", label: t.nav.kyc, badge: badges.kycWaiting },
           { href: "/admin/reports", label: t.nav.reports },
+          { href: "/admin/settings", label: t.branding.metaTitle },
         ],
       },
       donations,

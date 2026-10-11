@@ -661,3 +661,40 @@ ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS review_note VARCHAR(300); --
 UPDATE user_documents SET status = 'approved' WHERE verified_at IS NOT NULL AND status = 'pending';
 
 CREATE INDEX IF NOT EXISTS user_documents_queue_idx ON user_documents (status, created_at);
+
+-- ===========================================================================
+-- Platform branding and clan types: the super admin sets the app's name, logo
+-- and colours, and keeps the list of clan types clans are grouped by.
+-- Additive and re-runnable.
+-- ===========================================================================
+ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS app_name      VARCHAR(60) NOT NULL DEFAULT 'Clan Fund';
+ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS primary_color VARCHAR(7)  NOT NULL DEFAULT '#12357a';
+ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS accent_color  VARCHAR(7)  NOT NULL DEFAULT '#c29a4a';
+ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS logo_data     BYTEA;        -- PNG/JPG/WebP, checked by content on upload
+ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS logo_type     VARCHAR(30);
+
+CREATE TABLE IF NOT EXISTS clan_types (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        VARCHAR(80) NOT NULL,
+  description VARCHAR(300),
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE, -- a retired type stays on the clans that have it
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS clan_types_name_key ON clan_types (lower(name));
+
+-- A type in use can't be deleted, only retired.
+ALTER TABLE clans ADD COLUMN IF NOT EXISTS clan_type_id UUID REFERENCES clan_types(id) ON DELETE RESTRICT;
+
+-- ===========================================================================
+-- Support staff: run the platform alongside the super admin (everything except
+-- resetting passwords), and like the super admin belong to no clan.
+-- Additive and re-runnable.
+-- ===========================================================================
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'support';
+
+-- role::text again, because the enum value above is new in this same transaction.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_clan_required;
+ALTER TABLE users ADD CONSTRAINT users_clan_required CHECK (
+  (role::text IN ('super_admin', 'support', 'user') AND clan_id IS NULL) OR
+  (role::text IN ('clan_admin', 'member') AND clan_id IS NOT NULL)
+);

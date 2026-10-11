@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/dal";
 import { readUpload, type UploadCheck } from "@/lib/files";
 import { direct, notify, notifyMany, superAdminIds } from "@/lib/notify";
 import { getT } from "@/lib/i18n/server";
-import { documentSchema, profileSchema, type FormState } from "@/lib/definitions";
+import { STAFF_ROLES, documentSchema, profileSchema, type FormState } from "@/lib/definitions";
 import type { PoolClient } from "pg";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -148,7 +148,7 @@ export async function addDocument(_state: FormState, formData: FormData): Promis
  * does not sit with the clan that benefits from it.
  */
 export async function reviewDocument(_state: FormState, formData: FormData): Promise<FormState> {
-  const admin = await requireRole("super_admin");
+  const admin = await requireRole(...STAFF_ROLES);
   const t = (await getT()).kyc;
   const documentId = String(formData.get("documentId") ?? "");
   const note = String(formData.get("note") ?? "").trim().slice(0, 300) || null;
