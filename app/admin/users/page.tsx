@@ -4,7 +4,9 @@ import { PageHeading } from "@/components/app-shell";
 import { Pill, StatusBadge } from "@/components/badge";
 import { ArrowRightIcon } from "@/components/icons";
 import { Notice } from "@/components/ui";
+import { canManageAccount } from "@/lib/access";
 import { requireRole } from "@/lib/dal";
+import { STAFF_ROLES } from "@/lib/definitions";
 import { formatDate, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
@@ -17,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminUsersPage({ searchParams }: PageProps<"/admin/users">) {
-  await requireRole("super_admin");
+  const me = await requireRole(...STAFF_ROLES);
   const [t, locale, sp] = await Promise.all([getT(), getLocale(), searchParams]);
   const u = t.users;
   const people = typeof sp.people === "string" ? sp.people : "all";
@@ -35,7 +37,14 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
 
   return (
     <>
-      <PageHeading title={u.title} lede={u.lede} />
+      <PageHeading title={u.title} lede={u.lede}>
+        <Link
+          href="/admin/users/new"
+          className="inline-flex h-11 shrink-0 items-center rounded-lg bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-2"
+        >
+          + {u.newButton}
+        </Link>
+      </PageHeading>
 
       {sp.done === "deleted" && (
         <div className="mt-4">
@@ -139,7 +148,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <div className="flex flex-wrap items-center justify-end gap-1">
-                      {p.role === "super_admin" ? (
+                      {!canManageAccount(me, p.role) ? (
                         <span className="px-2 text-xs text-muted">{u.protected}</span>
                       ) : (
                         <>

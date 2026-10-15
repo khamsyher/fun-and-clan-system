@@ -24,6 +24,7 @@ export type NotificationType =
   | "donation_confirmed"
   | "donation_rejected"
   | "treasurer_assigned"
+  | "leader_assigned"
   | "join_requested"
   | "join_approved"
   | "join_rejected"
@@ -93,9 +94,9 @@ export async function clanTreasurerIds(db: Db, clanId: string) {
   return r.rows.map((x) => x.id);
 }
 
-/** The platform owners, who review identity documents. */
+/** Platform staff (super admin and support), who review identity documents. */
 export async function superAdminIds(db: Db) {
-  const r = await db.query<{ id: string }>(`SELECT id FROM users WHERE role = 'super_admin' AND status = 'active'`);
+  const r = await db.query<{ id: string }>(`SELECT id FROM users WHERE role IN ('super_admin', 'support') AND status = 'active'`);
   return r.rows.map((x) => x.id);
 }
 

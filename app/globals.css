@@ -71,7 +71,7 @@ h3 {
 /* Deep blue panel with a soft light source in one corner. */
 .panel-brand {
   background:
-    radial-gradient(120% 90% at 0% 0%, rgb(42 95 208 / 0.35), transparent 60%),
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--color-brand-bright) 35%, transparent), transparent 60%),
     linear-gradient(160deg, var(--color-brand) 0%, var(--color-brand-deep) 100%);
 }
 

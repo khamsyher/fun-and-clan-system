@@ -66,10 +66,7 @@ export function RegisterForm() {
         required
       />
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label={r.email} name="email" type="email" autoComplete="email" optional defaultValue={v?.email} errors={e?.email} />
-        <Field label={r.village} name="village" autoComplete="address-level2" optional defaultValue={v?.village} errors={e?.village} />
-      </div>
+      <Field label={r.email} name="email" type="email" autoComplete="email" optional defaultValue={v?.email} errors={e?.email} />
 
       <Field
         label={r.password}

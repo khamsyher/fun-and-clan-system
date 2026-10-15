@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Newsreader, Noto_Sans_Lao, Noto_Serif_Lao, Public_Sans } from "next/font/google";
 import { I18nProvider } from "@/components/i18n-provider";
+import { getBranding, logoUrl, themeCss } from "@/lib/branding";
 import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
@@ -26,24 +27,36 @@ const notoSerifLao = Noto_Serif_Lao({
   subsets: ["lao"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "Clan Fund",
-    template: "%s · Clan Fund",
-  },
-  description: "Funeral mutual-aid fund management for clans.",
-};
+// The name, logo and colours come from the super admin's settings.
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBranding();
+  const logo = logoUrl(brand);
+  return {
+    title: {
+      default: brand.appName,
+      template: `%s · ${brand.appName}`,
+    },
+    description: "Funeral mutual-aid fund management for clans.",
+    ...(logo ? { icons: { icon: logo, apple: logo } } : {}),
+  };
+}
 
-export const viewport: Viewport = {
-  themeColor: "#12357a",
-};
+export async function generateViewport(): Promise<Viewport> {
+  return { themeColor: (await getBranding()).primaryColor };
+}
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const locale = await getLocale();
+  const [locale, brand] = await Promise.all([getLocale(), getBranding()]);
   const fonts = [publicSans, newsreader, notoSansLao, notoSerifLao].map((f) => f.variable).join(" ");
+  const theme = themeCss(brand);
 
   return (
     <html lang={locale} className={`${fonts} h-full antialiased`}>
+      {theme && (
+        <head>
+          <style>{theme}</style>
+        </head>
+      )}
       <body className="min-h-full bg-paper text-ink">
         <I18nProvider locale={locale}>{children}</I18nProvider>
       </body>

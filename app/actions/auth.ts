@@ -79,7 +79,6 @@ export async function register(_state: FormState, formData: FormData): Promise<F
     "fullName",
     "phone",
     "email",
-    "village",
     "password",
     "confirmPassword",
   ]);
@@ -120,8 +119,8 @@ export async function register(_state: FormState, formData: FormData): Promise<F
 
   const passwordHash = await hashPassword(d.password);
   const inserted = await queryOne<{ id: string }>(
-    `INSERT INTO users (clan_id, role, status, full_name, phone, email, village, password_hash)
-     VALUES ($1, $2::user_role, $3::user_status, $4, $5, $6, $7, $8)
+    `INSERT INTO users (clan_id, role, status, full_name, phone, email, password_hash)
+     VALUES ($1, $2::user_role, $3::user_status, $4, $5, $6, $7)
      RETURNING id`,
     [
       clan?.id ?? null,
@@ -130,7 +129,6 @@ export async function register(_state: FormState, formData: FormData): Promise<F
       d.fullName,
       d.phone,
       d.email,
-      d.village,
       passwordHash,
     ],
   );

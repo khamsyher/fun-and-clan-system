@@ -1,43 +1,35 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeading, Section } from "@/components/app-shell";
-import { StatusBadge } from "@/components/badge";
 import { ArrowRightIcon } from "@/components/icons";
-import { ResetPasswordButton } from "@/components/reset-password";
 import { requireRole } from "@/lib/dal";
-import { query, queryOne } from "@/lib/db";
-import { formatDate, formatKip, formatNumber } from "@/lib/format";
+import { STAFF_ROLES } from "@/lib/definitions";
+import { queryOne } from "@/lib/db";
+import { formatKip, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
+<<<<<<< HEAD
 import { getLocale, getT } from "@/lib/i18n/server";
 import { markFeeReceived, markSavingsFeeReceived, setClanActive } from "@/app/actions/admin";
 import { Pill } from "@/components/badge";
 import { CreateClanForm, PlatformFeeForm, SavingsFeeForm } from "./forms";
+=======
+import { getT } from "@/lib/i18n/server";
+>>>>>>> db562b9d59c1899663c702d68d54bb2f8034871c
 import { countPeople } from "@/lib/users";
 import { PeopleCard } from "./people-card";
+import { Stat } from "./stat";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).admin.metaTitle };
 }
 
-type ClanRow = {
-  id: string;
-  code: string;
-  name: string;
-  fund_mode: "A" | "B";
-  contribution_amount: string;
-  is_active: boolean;
-  created_at: Date;
-  leader: string | null;
-  leader_id: string | null;
-  members: string;
-  pending: string;
-};
-
+/** The platform at a glance. Clans, the fund and users each have their own page for the work itself. */
 export default async function AdminPage() {
-  await requireRole("super_admin");
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  await requireRole(...STAFF_ROLES);
+  const t = await getT();
   const a = t.admin;
 
+<<<<<<< HEAD
   const [clans, totals, settings, money, fees, counts, savingsFees] = await Promise.all([
     query<ClanRow>(
       `SELECT c.id, c.code, c.name, c.fund_mode, c.contribution_amount, c.is_active, c.created_at,
@@ -53,25 +45,26 @@ export default async function AdminPage() {
         ORDER BY c.created_at DESC`,
     ),
     queryOne<{ clans: string; active_clans: string; members: string; pending: string }>(
+=======
+  const [totals, settings, money, counts] = await Promise.all([
+    queryOne<{ clans: string; active_clans: string; no_leader: string; members: string; pending: string }>(
+>>>>>>> db562b9d59c1899663c702d68d54bb2f8034871c
       `SELECT (SELECT COUNT(*) FROM clans) AS clans,
               (SELECT COUNT(*) FROM clans WHERE is_active) AS active_clans,
+              (SELECT COUNT(*) FROM clans c WHERE c.is_active AND NOT EXISTS (
+                 SELECT 1 FROM users u WHERE u.clan_id = c.id AND u.role = 'clan_admin' AND u.status = 'active')) AS no_leader,
               (SELECT COUNT(*) FROM users WHERE role = 'member' AND status = 'active') AS members,
               (SELECT COUNT(*) FROM users WHERE role = 'member' AND status = 'pending') AS pending`,
     ),
     queryOne<{ platform_fee_percent: string; savings_fee_percent: string }>(`SELECT platform_fee_percent, savings_fee_percent FROM platform_settings WHERE id = 1`),
     // Statistics only: totals across clans, no access to any clan's fund operations.
-    queryOne<{ events: string; collecting: string; collected: string; owed: string; received: string }>(
+    queryOne<{ events: string; collecting: string; collected: string; owed: string; received: string; owed_count: string }>(
       `SELECT (SELECT COUNT(*) FROM death_events WHERE status <> 'cancelled') AS events,
               (SELECT COUNT(*) FROM death_events WHERE status = 'collecting') AS collecting,
               (SELECT COALESCE(SUM(amount), 0) FROM fund_ledger WHERE entry_type IN ('collection', 'debt_collection', 'contribution', 'deposit', 'adjustment')) AS collected,
               (SELECT COALESCE(SUM(fee_amount), 0) FROM platform_fees WHERE status = 'owed') AS owed,
-              (SELECT COALESCE(SUM(fee_amount), 0) FROM platform_fees WHERE status = 'received') AS received`,
-    ),
-    query<{ id: string; clan_name: string; event_no: number; percent: string; base_amount: string; fee_amount: string; status: "owed" | "received"; created_at: Date }>(
-      `SELECT f.id, c.name AS clan_name, e.event_no, f.percent, f.base_amount, f.fee_amount, f.status, f.created_at
-         FROM platform_fees f JOIN clans c ON c.id = f.clan_id JOIN death_events e ON e.id = f.event_id
-        ORDER BY (f.status = 'owed') DESC, f.created_at DESC
-        LIMIT 50`,
+              (SELECT COALESCE(SUM(fee_amount), 0) FROM platform_fees WHERE status = 'received') AS received,
+              (SELECT COUNT(*) FROM platform_fees WHERE status = 'owed') AS owed_count`,
     ),
     countPeople(),
     query<{
@@ -117,6 +110,22 @@ export default async function AdminPage() {
         <Stat label={a.feesReceived} value={formatKip(money?.received ?? 0)} note={a.feesTitle} />
       </dl>
 
+      {/* Where the work is: each card opens the page for it, with what needs attention. */}
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <AreaCard
+          href="/admin/clans"
+          title={t.clansAdmin.title}
+          body={t.clansAdmin.cardBody}
+          alert={Number(totals?.no_leader ?? 0) > 0 ? fmt(t.clansAdmin.cardNoLeader, { n: totals?.no_leader ?? 0 }) : null}
+        />
+        <AreaCard
+          href="/admin/fund"
+          title={t.fundAdmin.title}
+          body={t.fundAdmin.cardBody}
+          alert={Number(money?.owed_count ?? 0) > 0 ? fmt(t.fundAdmin.cardOwed, { n: money?.owed_count ?? 0 }) : null}
+        />
+      </div>
+
       <Section
         title={a.usersTitle}
         aside={
@@ -135,6 +144,7 @@ export default async function AdminPage() {
           <PeopleCard label={a.filterWaiting} value={counts?.waiting ?? 0} href="/admin/users?people=waiting" tone="warn" />
         </div>
       </Section>
+<<<<<<< HEAD
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0">
@@ -326,16 +336,21 @@ export default async function AdminPage() {
         </div>
       </div>
 
+=======
+>>>>>>> db562b9d59c1899663c702d68d54bb2f8034871c
     </>
   );
 }
 
-function Stat({ label, value, note, highlight }: { label: string; value: string; note: string; highlight?: boolean }) {
+function AreaCard({ href, title, body, alert }: { href: string; title: string; body: string; alert: string | null }) {
   return (
-    <div className={`p-4 sm:p-5 ${highlight ? "panel-brand text-white" : "bg-surface"}`}>
-      <dt className={`text-sm ${highlight ? "text-white/75" : "text-ink-soft"}`}>{label}</dt>
-      <dd className={`tabular mt-1 font-display text-3xl ${highlight ? "text-white" : "text-brand-deep"}`}>{value}</dd>
-      <dd className={`mt-0.5 text-xs ${highlight ? "text-white/65" : "text-muted"}`}>{note}</dd>
-    </div>
+    <Link href={href} className="group flex items-start justify-between gap-4 rounded-xl border border-line bg-surface p-5 transition-colors hover:border-brand-bright">
+      <span>
+        <span className="block font-display text-xl text-brand-deep">{title}</span>
+        <span className="mt-1 block text-sm text-ink-soft">{body}</span>
+        {alert && <span className="mt-2 inline-block rounded-full bg-warn-wash px-2.5 py-0.5 text-xs font-medium text-warn">{alert}</span>}
+      </span>
+      <ArrowRightIcon width={18} height={18} className="mt-1 shrink-0 text-brand transition-transform group-hover:translate-x-0.5" />
+    </Link>
   );
 }

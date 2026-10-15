@@ -6,6 +6,7 @@ import { KycMark } from "@/components/kyc-status";
 import { KycReview } from "@/components/kyc-review";
 import { FileIcon } from "@/components/icons";
 import { requireRole } from "@/lib/dal";
+import { STAFF_ROLES } from "@/lib/definitions";
 import { formatDate, formatNumber } from "@/lib/format";
 import { countForReview, listForReview } from "@/lib/kyc";
 import { fmt } from "@/lib/i18n/config";
@@ -17,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminKycPage({ searchParams }: PageProps<"/admin/kyc">) {
-  await requireRole("super_admin");
+  await requireRole(...STAFF_ROLES);
   const [t, locale, sp] = await Promise.all([getT(), getLocale(), searchParams]);
   const k = t.kyc;
   const filter = typeof sp.show === "string" ? sp.show : "pending";

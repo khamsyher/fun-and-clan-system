@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/dal";
+import { isStaffRole } from "@/lib/definitions";
 import { platformPdf } from "@/lib/export/pdf";
 import { platformWorkbook } from "@/lib/export/xlsx";
 import { DICTIONARIES } from "@/lib/i18n/config";
@@ -7,10 +8,10 @@ import { getLocale } from "@/lib/i18n/server";
 import { reportFileName } from "@/lib/report-text";
 import { getPlatformReport, parseRange } from "@/lib/reports";
 
-/** Downloads the platform statistics report (super admin only). */
+/** Downloads the platform statistics report (platform staff only). */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "super_admin") return new Response("Forbidden", { status: 403 });
+  if (!user || !isStaffRole(user.role)) return new Response("Forbidden", { status: 403 });
 
   const sp = req.nextUrl.searchParams;
   const range = parseRange({ from: sp.get("from") ?? undefined, to: sp.get("to") ?? undefined });

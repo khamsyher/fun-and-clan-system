@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PageHeading, Section } from "@/components/app-shell";
 import { ReportRange } from "@/components/report-range";
 import { requireRole } from "@/lib/dal";
+import { STAFF_ROLES } from "@/lib/definitions";
 import { formatDate, formatKip, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
@@ -12,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminReportsPage({ searchParams }: PageProps<"/admin/reports">) {
-  await requireRole("super_admin");
+  await requireRole(...STAFF_ROLES);
   const [t, locale] = await Promise.all([getT(), getLocale()]);
   const rt = t.reports;
   const range = parseRange(await searchParams);

@@ -1,3 +1,5 @@
+import { getBranding, logoUrl } from "@/lib/branding";
+
 /** Mark: an open circle of hands — concentric rings closing around a centre. */
 export function BrandMark({ className = "size-8" }: { className?: string }) {
   return (
@@ -9,12 +11,20 @@ export function BrandMark({ className = "size-8" }: { className?: string }) {
   );
 }
 
-export function BrandName({ tone = "ink" }: { tone?: "ink" | "light" }) {
+/** The platform's name and logo, as the super admin set them; the built-in mark when there is no logo. */
+export async function BrandName({ tone = "ink" }: { tone?: "ink" | "light" }) {
+  const brand = await getBranding();
+  const logo = logoUrl(brand);
   return (
     <span className="flex items-center gap-2.5">
-      <BrandMark className={`size-8 ${tone === "light" ? "text-white" : "text-brand"}`} />
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- served from the database, any size
+        <img src={logo} alt="" className="size-8 shrink-0 rounded-md object-contain" />
+      ) : (
+        <BrandMark className={`size-8 ${tone === "light" ? "text-white" : "text-brand"}`} />
+      )}
       <span className={`font-display text-xl leading-none ${tone === "light" ? "text-white" : "text-brand"}`}>
-        Clan Fund
+        {brand.appName}
       </span>
     </span>
   );

@@ -7,6 +7,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { Pill } from "@/components/badge";
 import { ShareButtons } from "@/components/share-buttons";
 import { buttonPrimary } from "@/components/button-styles";
+import { getBranding } from "@/lib/branding";
 import { getCurrentUser } from "@/lib/dal";
 import { getRequest } from "@/lib/donations";
 import { formatDate } from "@/lib/format";
@@ -18,7 +19,7 @@ import { shareUrl, siteUrl } from "@/lib/site-url";
 export async function generateMetadata({ params }: PageProps<"/d/[id]">): Promise<Metadata> {
   const { id } = await params;
   const request = await getRequest(id);
-  if (!request) return { title: "Clan Fund" };
+  if (!request) return { title: (await getBranding()).appName };
   const base = await siteUrl();
   return {
     title: request.title,
