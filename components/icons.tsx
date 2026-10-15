@@ -180,6 +180,14 @@ export const PercentIcon =(p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const UserPlusIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M15.5 20v-1.5a3.5 3.5 0 0 0-3.5-3.5H7a3.5 3.5 0 0 0-3.5 3.5V20" />
+    <circle cx="9.5" cy="8" r="3.25" />
+    <path d="M18 7.75v5M20.5 10.25h-5" />
+  </Icon>
+);
+
 export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M4.75 6.5h14.5" />

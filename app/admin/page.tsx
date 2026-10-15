@@ -9,9 +9,9 @@ import { query, queryOne } from "@/lib/db";
 import { formatDate, formatKip, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
-import { markFeeReceived, setClanActive } from "@/app/actions/admin";
+import { markFeeReceived, markSavingsFeeReceived, setClanActive } from "@/app/actions/admin";
 import { Pill } from "@/components/badge";
-import { CreateClanForm, PlatformFeeForm } from "./forms";
+import { CreateClanForm, PlatformFeeForm, SavingsFeeForm } from "./forms";
 import { countPeople } from "@/lib/users";
 import { PeopleCard } from "./people-card";
 
@@ -38,7 +38,7 @@ export default async function AdminPage() {
   const [t, locale] = await Promise.all([getT(), getLocale()]);
   const a = t.admin;
 
-  const [clans, totals, settings, money, fees, counts] = await Promise.all([
+  const [clans, totals, settings, money, fees, counts, savingsFees] = await Promise.all([
     query<ClanRow>(
       `SELECT c.id, c.code, c.name, c.fund_mode, c.contribution_amount, c.is_active, c.created_at,
               l.full_name AS leader, l.id AS leader_id,
@@ -58,7 +58,7 @@ export default async function AdminPage() {
               (SELECT COUNT(*) FROM users WHERE role = 'member' AND status = 'active') AS members,
               (SELECT COUNT(*) FROM users WHERE role = 'member' AND status = 'pending') AS pending`,
     ),
-    queryOne<{ platform_fee_percent: string }>(`SELECT platform_fee_percent FROM platform_settings WHERE id = 1`),
+    queryOne<{ platform_fee_percent: string; savings_fee_percent: string }>(`SELECT platform_fee_percent, savings_fee_percent FROM platform_settings WHERE id = 1`),
     // Statistics only: totals across clans, no access to any clan's fund operations.
     queryOne<{ events: string; collecting: string; collected: string; owed: string; received: string }>(
       `SELECT (SELECT COUNT(*) FROM death_events WHERE status <> 'cancelled') AS events,
@@ -74,9 +74,31 @@ export default async function AdminPage() {
         LIMIT 50`,
     ),
     countPeople(),
+    query<{
+      id: string;
+      group_name: string;
+      round_no: number;
+      receiver_name: string;
+      receiver_phone: string;
+      percent: string;
+      base_amount: string;
+      fee_amount: string;
+      status: "owed" | "received";
+      created_at: Date;
+    }>(
+      `SELECT f.id, g.name AS group_name, r.round_no, u.full_name AS receiver_name, u.phone AS receiver_phone,
+              f.percent, f.base_amount, f.fee_amount, f.status, f.created_at
+         FROM savings_fees f
+         JOIN savings_rounds r ON r.id = f.round_id
+         JOIN savings_groups g ON g.id = r.group_id
+         JOIN users u ON u.id = f.payer_user_id
+        ORDER BY (f.status = 'owed') DESC, f.created_at DESC
+        LIMIT 50`,
+    ),
   ]);
 
   const fee = settings?.platform_fee_percent ?? "1.50";
+  const savingsFee = settings?.savings_fee_percent ?? "1.00";
 
   return (
     <>
@@ -233,6 +255,56 @@ export default async function AdminPage() {
               </div>
             )}
           </Section>
+
+          <Section title={a.savingsFeesTitle}>
+            {savingsFees.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-6 text-center text-sm text-ink-soft">{a.noSavingsFees}</p>
+            ) : (
+              <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
+                <table className="w-full min-w-[36rem] text-left text-sm">
+                  <thead className="border-b border-line bg-brand-wash/60 text-xs text-ink-soft">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">{a.colGroup}</th>
+                      <th className="px-4 py-3 text-right font-medium">{a.colBase}</th>
+                      <th className="px-4 py-3 text-right font-medium">{a.colFee}</th>
+                      <th className="px-4 py-3 font-medium">{a.colStatus}</th>
+                      <th className="px-4 py-3"><span className="sr-only">{a.markReceived}</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {savingsFees.map((f) => (
+                      <tr key={f.id}>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-ink">{f.group_name}</p>
+                          <p className="text-xs text-muted">
+                            {fmt(t.savings.roundNo, { n: f.round_no })} · {f.receiver_name} · {f.receiver_phone} · {formatDate(f.created_at, locale)}
+                          </p>
+                        </td>
+                        <td className="tabular px-4 py-3 text-right text-ink-soft">{formatKip(f.base_amount)}</td>
+                        <td className="tabular px-4 py-3 text-right font-semibold text-ink">
+                          {formatKip(f.fee_amount)}
+                          <span className="block text-xs font-normal text-muted">{Number(f.percent)}%</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Pill tone={f.status === "owed" ? "warn" : "ok"}>{a.feeStatus[f.status]}</Pill>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {f.status === "owed" && (
+                            <form action={markSavingsFeeReceived}>
+                              <input type="hidden" name="feeId" value={f.id} />
+                              <button type="submit" className="rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-ok hover:bg-ok-wash">
+                                {a.markReceived}
+                              </button>
+                            </form>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
         </div>
 
         <div>
@@ -244,6 +316,11 @@ export default async function AdminPage() {
           <Section title={a.feeTitle}>
             <div className="rounded-xl border border-line bg-surface p-5">
               <PlatformFeeForm current={fee} />
+            </div>
+          </Section>
+          <Section title={a.savingsFeeTitle}>
+            <div className="rounded-xl border border-line bg-surface p-5">
+              <SavingsFeeForm current={savingsFee} />
             </div>
           </Section>
         </div>

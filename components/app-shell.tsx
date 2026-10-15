@@ -12,6 +12,7 @@ import { renderNotification } from "@/lib/notification-text";
 import { listNotifications, unreadCount } from "@/lib/notify";
 import { countPendingKyc } from "@/lib/kyc";
 import { AreaNav } from "./area-nav";
+import { MobileNav, SideNav } from "./side-nav";
 import { areasFor } from "@/lib/navigation";
 export async function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
   const [t, locale, recent, unread, kycWaiting] = await Promise.all([
@@ -27,18 +28,9 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
     .map((p) => p[0]?.toUpperCase())
     .join("");
 
-  return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-20 border-b border-line bg-paper/90 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-4">
-            <BrandName />
-            {user.clanName && (
-              <span className="hidden min-w-0 truncate border-l border-line-strong pl-4 text-sm text-ink-soft md:block">
-                {user.clanName}
-              </span>
-            )}
-          </div>
+  const areas = areasFor(user, t, { kycWaiting });
+
+  const controls = (
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="sm:hidden">
               <LanguageSwitcher tone="compact" />
@@ -76,9 +68,57 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
               </button>
             </form>
           </div>
+  );
+
+  // The platform owner works across many admin pages, so their menu is a sidebar
+  // (a slide-in drawer on small screens) instead of area tabs.
+  if (user.role === "super_admin") {
+    return (
+      <div className="min-h-dvh lg:flex">
+        <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface lg:flex">
+          <div className="flex h-16 shrink-0 items-center border-b border-line px-5">
+            <Link href="/admin">
+              <BrandName />
+            </Link>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 py-5">
+            <SideNav areas={areas} />
+          </div>
+        </aside>
+        <div className="min-w-0 flex-1">
+          {/* Solid, not blurred: a backdrop filter would trap the drawer (position: fixed) inside the header. */}
+          <header className="sticky top-0 z-20 border-b border-line bg-paper">
+            <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-2 lg:hidden">
+                <MobileNav areas={areas} brand={<BrandName />} />
+                <BrandName />
+              </div>
+              <div className="hidden lg:block" />
+              {controls}
+            </div>
+          </header>
+          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-dvh">
+      <header className="sticky top-0 z-20 border-b border-line bg-paper/90 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-4">
+            <BrandName />
+            {user.clanName && (
+              <span className="hidden min-w-0 truncate border-l border-line-strong pl-4 text-sm text-ink-soft md:block">
+                {user.clanName}
+              </span>
+            )}
+          </div>
+          {controls}
         </div>
         <div className="mx-auto max-w-6xl px-2 sm:px-4">
-          <AreaNav areas={areasFor(user, t, { kycWaiting })} />
+          <AreaNav areas={areas} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>

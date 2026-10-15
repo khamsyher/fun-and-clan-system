@@ -8,13 +8,15 @@ import { ProfileEditor } from "./profile-editor";
 import { Avatar } from "@/components/profile-facts";
 import { withdrawJoinRequest } from "@/app/actions/membership";
 import { requireRole } from "@/lib/dal";
-import { canJoinClan } from "@/lib/access";
+import { canJoinClan, canManageFamily } from "@/lib/access";
+import { listDependents } from "@/lib/family";
 import { formatDate } from "@/lib/format";
 import { latestJoinRequest } from "@/lib/membership";
 import { getProfile, listDocuments, toDateInput } from "@/lib/profile";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { DocumentForm } from "./document-form";
+import { FamilyManager } from "./family-manager";
 import { JoinClanForm } from "./join-clan-form";
 import { ChangePasswordForm } from "./password-form";
 
@@ -24,13 +26,15 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AccountPage() {
   const user = await requireRole();
-  // Only a general user can be waiting to join a clan.
-  const [t, locale, profile, documents, join] = await Promise.all([
+  // The locale comes first: the family list formats its dates with it.
+  const locale = await getLocale();
+  const [t, profile, documents, join, family] = await Promise.all([
     getT(),
-    getLocale(),
     getProfile(user.id),
     listDocuments(user.id),
+    // Only a general user can be waiting to join a clan; only a member has a household here.
     user.role === "user" ? latestJoinRequest(user.id) : null,
+    canManageFamily(user) ? listDependents(user.id, user.clanId, locale) : [],
   ]);
   const a = t.account;
   const p = t.profile;
@@ -74,6 +78,19 @@ export default async function AccountPage() {
             {documents.length > 0 && <DocumentList docs={documents} t={t} locale={locale} canOpenFile emptyText={p.noDocuments} />}
             <DocumentForm hasDocuments={documents.length > 0} />
           </section>
+
+          {/* The household this fund covers. It lives beside their own details, because it is
+              part of who they are here rather than a separate errand. */}
+          {canManageFamily(user) && (
+            <section id="family" className="mt-12 min-w-0 scroll-mt-28">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-ink">{t.family.title}</h2>
+                {family.length > 0 && <span className="text-sm text-muted">{fmt(t.family.count, { n: family.length })}</span>}
+              </div>
+              <p className="mb-4 max-w-[65ch] text-sm text-ink-soft">{t.family.lede}</p>
+              <FamilyManager dependents={family} />
+            </section>
+          )}
         </div>
 
         <div className="space-y-6">

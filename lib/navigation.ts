@@ -5,9 +5,10 @@ import type { Dictionary } from "./i18n/config";
 /**
  * Every tab in the app, in one place.
  *
- * The product is two areas, and a feature belongs to exactly one of them:
+ * The product is three areas, and a feature belongs to exactly one of them:
  *  - the **funeral fund**, which is a single clan's business (members, events, money);
- *  - **donations**, which is the whole platform's (anyone the platform has identified).
+ *  - **donations**, which is the whole platform's (anyone the platform has identified);
+ *  - **savings groups**, which belong to whoever is in them, from any clan or none.
  * The platform owner's own area replaces the fund area, since they run the system
  * rather than belong to a clan.
  *
@@ -25,8 +26,17 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
     sections: [],
   };
 
-  // A general user belongs to no clan, so donations is the only area they have.
-  if (user.role === "user") return [donations];
+  const savings: NavArea = {
+    href: "/savings",
+    label: t.nav.areaSavings,
+    note: t.nav.areaSavingsNote,
+    icon: "savings",
+    owns: [],
+    sections: [],
+  };
+
+  // A general user belongs to no clan, so donations and savings groups are what they have.
+  if (user.role === "user") return [donations, savings];
 
   if (user.role === "super_admin")
     return [
@@ -67,6 +77,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
         ],
       },
       donations,
+      savings,
     ];
 
   return [
@@ -80,10 +91,10 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
         { href: "/member", label: t.nav.overview },
         { href: "/member/events", label: t.nav.events },
         { href: "/member/payments", label: t.nav.payments },
-        { href: "/member/family", label: t.nav.family },
         ...(user.isTreasurer ? [{ href: "/member/approvals", label: t.nav.approvals }] : []),
       ],
     },
     donations,
+    savings,
   ];
 }

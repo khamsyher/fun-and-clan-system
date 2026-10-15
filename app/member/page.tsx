@@ -126,7 +126,7 @@ export default async function MemberPage() {
             </ul>
           )}
           <Link
-            href="/member/family"
+            href="/account#family"
             className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-bright"
           >
             {m.familyManage}

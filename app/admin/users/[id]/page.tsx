@@ -80,7 +80,7 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
 
           <Section title={u.activity}>
             <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-5">
-              <Count label={t.nav.family} value={person.family} />
+              <Count label={u.countFamily} value={person.family} />
               <Count label={u.countRequests} value={person.requests} />
               <Count label={u.countDonations} value={person.donations} />
               <Count label={u.countOpenBills} value={person.open_bills} tone={Number(person.open_bills) > 0 ? "warn" : undefined} />

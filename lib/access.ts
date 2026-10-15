@@ -27,6 +27,14 @@ export function canJoinClan(user: CurrentUser) {
   return user.role === "user" && user.kycApproved;
 }
 
+/**
+ * A household list only matters where a fund covers it, so it stays with the members a clan
+ * collects for. Nobody else — the platform owner and a clanless user have no fund behind them.
+ */
+export function canManageFamily(user: CurrentUser) {
+  return user.role === "member";
+}
+
 /** Identity decisions rest with the platform, never with the clan that benefits from them. */
 export function canReviewKyc(user: CurrentUser) {
   return user.role === "super_admin";

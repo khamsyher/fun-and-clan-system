@@ -1,17 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { query, queryOne } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
+import { canManageFamily } from "@/lib/access";
 import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
-import { RELATIONSHIPS, type FormState, type Relationship } from "@/lib/definitions";
+import { RELATIONSHIPS, ROLE_HOME, type FormState, type Relationship } from "@/lib/definitions";
+
+/** The page and these actions ask the same question, since the page can be bypassed. */
+async function requireFamilyKeeper() {
+  const me = await requireRole();
+  if (!canManageFamily(me)) redirect(ROLE_HOME[me.role]);
+  return me;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Adds a dependent, or edits one when an id is given. Always scoped to the signed-in member. */
 export async function saveDependent(_state: FormState, formData: FormData): Promise<FormState> {
-  const me = await requireRole("member");
+  const me = await requireFamilyKeeper();
   const t = (await getT()).family;
 
   const id = String(formData.get("id") ?? "");
@@ -36,6 +45,7 @@ export async function saveDependent(_state: FormState, formData: FormData): Prom
     );
     if (!updated) return { message: t.nameRequired, values };
     await audit(me.clanId, me.id, "dependent.updated", id);
+    revalidatePath("/account");
     revalidatePath("/member", "layout");
     return { success: fmt(t.updated, { name: fullName }) };
   }
@@ -46,13 +56,14 @@ export async function saveDependent(_state: FormState, formData: FormData): Prom
     [me.clanId, me.id, fullName, relationship, dob || null],
   );
   await audit(me.clanId, me.id, "dependent.added", inserted!.id);
+  revalidatePath("/account");
   revalidatePath("/member", "layout");
   return { success: fmt(t.added, { name: fullName }) };
 }
 
 /** Soft delete: Phase 3 death events may still refer to the person. */
 export async function removeDependent(_state: FormState, formData: FormData): Promise<FormState> {
-  const me = await requireRole("member");
+  const me = await requireFamilyKeeper();
   const t = (await getT()).family;
   const id = String(formData.get("id") ?? "");
   if (!UUID.test(id)) return undefined;
@@ -65,6 +76,7 @@ export async function removeDependent(_state: FormState, formData: FormData): Pr
   );
   if (!removed) return undefined;
   await audit(me.clanId, me.id, "dependent.removed", id);
+  revalidatePath("/account");
   revalidatePath("/member", "layout");
   return { success: fmt(t.removed, { name: removed.full_name }) };
 }

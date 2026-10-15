@@ -98,3 +98,38 @@ export async function markFeeReceived(formData: FormData) {
   }
   revalidatePath("/admin");
 }
+
+/** The savings group fee is separate from the funeral fee; each group keeps the rate it started with. */
+export async function updateSavingsFee(_state: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireRole("super_admin");
+  const t = await getT();
+  const raw = String(formData.get("fee") ?? "").trim();
+  const fee = Number(raw);
+  if (raw === "" || !Number.isFinite(fee) || fee < 0 || fee > 100) {
+    return { errors: { fee: [t.errors.feeRange] }, values: { fee: raw } };
+  }
+  const rounded = Math.round(fee * 100) / 100;
+  await query(`UPDATE platform_settings SET savings_fee_percent = $1, updated_at = now() WHERE id = 1`, [rounded]);
+  await query(`INSERT INTO audit_logs (actor_id, action, details) VALUES ($1, 'platform.savings_fee_updated', $2)`, [
+    admin.id,
+    JSON.stringify({ savings_fee_percent: rounded }),
+  ]);
+  revalidatePath("/admin");
+  return { success: fmt(t.admin.savingsFeeSaved, { fee: rounded }) };
+}
+
+/** The system owner confirms a savings round's fee arrived. */
+export async function markSavingsFeeReceived(formData: FormData) {
+  const admin = await requireRole("super_admin");
+  const feeId = String(formData.get("feeId") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(feeId)) return;
+  const updated = await query<{ id: string }>(
+    `UPDATE savings_fees SET status = 'received', received_at = now(), received_by = $2
+      WHERE id = $1 AND status = 'owed' RETURNING id`,
+    [feeId, admin.id],
+  );
+  if (updated[0]) {
+    await query(`INSERT INTO audit_logs (actor_id, action, target_id) VALUES ($1, 'platform.savings_fee_received', $2)`, [admin.id, feeId]);
+  }
+  revalidatePath("/admin");
+}

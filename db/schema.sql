@@ -661,3 +661,145 @@ ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS review_note VARCHAR(300); --
 UPDATE user_documents SET status = 'approved' WHERE verified_at IS NOT NULL AND status = 'pending';
 
 CREATE INDEX IF NOT EXISTS user_documents_queue_idx ON user_documents (status, created_at);
+
+-- ===========================================================================
+-- Rotating savings groups. Anyone signed in (not the platform owner) organizes a
+-- group; members join with its code. Each round every member transfers straight to
+-- that round's receiver, who confirms the slips; the receiver owes the platform a
+-- fee on the pot. Money never passes through the platform. Additive and re-runnable.
+-- ===========================================================================
+
+ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS savings_fee_percent NUMERIC(5, 2) NOT NULL DEFAULT 1.00
+  CHECK (savings_fee_percent >= 0 AND savings_fee_percent <= 100);
+
+DO $$ BEGIN
+  CREATE TYPE savings_group_status AS ENUM ('forming', 'active', 'completed', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE savings_period AS ENUM ('weekly', 'monthly');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE savings_member_status AS ENUM ('pending', 'approved', 'declined', 'removed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE savings_round_status AS ENUM ('upcoming', 'collecting', 'done');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE savings_payment_status AS ENUM ('unpaid', 'pending', 'confirmed', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS savings_groups (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organizer_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  name         VARCHAR(100) NOT NULL,
+  description  TEXT,
+  amount       BIGINT NOT NULL CHECK (amount > 0), -- per person per round, in kip
+  period       savings_period NOT NULL,
+  start_date   DATE NOT NULL,                      -- round 1's due date
+  invite_code  VARCHAR(8) NOT NULL UNIQUE,
+  fee_percent  NUMERIC(5, 2),                      -- copied from platform_settings when the group starts
+  status       savings_group_status NOT NULL DEFAULT 'forming',
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at   TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS savings_groups_organizer_idx ON savings_groups (organizer_id);
+
+-- One row per person per group. The organizer is a member too and takes a turn.
+CREATE TABLE IF NOT EXISTS savings_members (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id       UUID NOT NULL REFERENCES savings_groups(id) ON DELETE RESTRICT,
+  user_id        UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  status         savings_member_status NOT NULL DEFAULT 'pending',
+  turn_no        INT CHECK (turn_no IS NULL OR turn_no > 0),
+  bank_name      VARCHAR(100),                     -- where this member receives their pot
+  account_name   VARCHAR(150),
+  account_number VARCHAR(50),
+  qr_file_id     UUID REFERENCES files(id) ON DELETE RESTRICT,
+  joined_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at     TIMESTAMPTZ,
+  UNIQUE (group_id, user_id),
+  -- Deferred so the whole order can be rewritten in one statement.
+  CONSTRAINT savings_members_turn_unique UNIQUE (group_id, turn_no) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX IF NOT EXISTS savings_members_user_idx ON savings_members (user_id);
+
+CREATE TABLE IF NOT EXISTS savings_rounds (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id           UUID NOT NULL REFERENCES savings_groups(id) ON DELETE RESTRICT,
+  round_no           INT NOT NULL CHECK (round_no > 0),
+  receiver_member_id UUID NOT NULL REFERENCES savings_members(id) ON DELETE RESTRICT,
+  due_date           DATE NOT NULL,
+  status             savings_round_status NOT NULL DEFAULT 'upcoming',
+  opened_at          TIMESTAMPTZ,
+  done_at            TIMESTAMPTZ,
+  last_reminder_at   TIMESTAMPTZ,
+  UNIQUE (group_id, round_no)
+);
+-- Only one round of a group collects at a time.
+CREATE UNIQUE INDEX IF NOT EXISTS savings_rounds_one_collecting ON savings_rounds (group_id) WHERE status = 'collecting';
+
+-- One row per payer per round (never the round's own receiver).
+CREATE TABLE IF NOT EXISTS savings_payments (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  round_id               UUID NOT NULL REFERENCES savings_rounds(id) ON DELETE RESTRICT,
+  payer_member_id        UUID NOT NULL REFERENCES savings_members(id) ON DELETE RESTRICT,
+  amount                 BIGINT NOT NULL CHECK (amount > 0),
+  status                 savings_payment_status NOT NULL DEFAULT 'unpaid',
+  slip_file_id           UUID REFERENCES files(id) ON DELETE RESTRICT,
+  transfer_date          DATE,
+  confirmed_without_slip BOOLEAN NOT NULL DEFAULT FALSE, -- the receiver got cash
+  review_note            TEXT,
+  submitted_at           TIMESTAMPTZ,
+  reviewed_at            TIMESTAMPTZ,
+  UNIQUE (round_id, payer_member_id)
+);
+CREATE INDEX IF NOT EXISTS savings_payments_slip_idx ON savings_payments (slip_file_id) WHERE slip_file_id IS NOT NULL;
+
+-- Who owes what and for which round is fixed once written; only the review may change.
+CREATE OR REPLACE FUNCTION lock_savings_payment() RETURNS trigger AS $$
+BEGIN
+  IF NEW.amount IS DISTINCT FROM OLD.amount OR NEW.round_id IS DISTINCT FROM OLD.round_id
+     OR NEW.payer_member_id IS DISTINCT FROM OLD.payer_member_id THEN
+    RAISE EXCEPTION 'A savings payment''s amount, round and payer cannot be changed';
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS savings_payments_lock ON savings_payments;
+CREATE TRIGGER savings_payments_lock BEFORE UPDATE ON savings_payments
+  FOR EACH ROW EXECUTE FUNCTION lock_savings_payment();
+
+-- Platform fee per completed round, owed by its receiver until the super admin marks it received.
+CREATE TABLE IF NOT EXISTS savings_fees (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  round_id      UUID NOT NULL UNIQUE REFERENCES savings_rounds(id) ON DELETE RESTRICT,
+  payer_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  percent       NUMERIC(5, 2) NOT NULL,
+  base_amount   BIGINT NOT NULL,
+  fee_amount    BIGINT NOT NULL CHECK (fee_amount >= 0),
+  status        fee_status NOT NULL DEFAULT 'owed',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  received_at   TIMESTAMPTZ,
+  received_by   UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- A member asks another to trade turns. Only allowed while neither has received any money;
+-- the other member's acceptance swaps the two rounds at once.
+DO $$ BEGIN
+  CREATE TYPE savings_swap_status AS ENUM ('pending', 'accepted', 'declined', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS savings_swaps (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id       UUID NOT NULL REFERENCES savings_groups(id) ON DELETE RESTRICT,
+  from_member_id UUID NOT NULL REFERENCES savings_members(id) ON DELETE RESTRICT,
+  to_member_id   UUID NOT NULL REFERENCES savings_members(id) ON DELETE RESTRICT,
+  status         savings_swap_status NOT NULL DEFAULT 'pending',
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at     TIMESTAMPTZ,
+  CHECK (from_member_id <> to_member_id)
+);
+-- One open request per person at a time.
+CREATE UNIQUE INDEX IF NOT EXISTS savings_swaps_one_open ON savings_swaps (from_member_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS savings_swaps_group_idx ON savings_swaps (group_id, status);
+ALTER TABLE savings_swaps ADD COLUMN IF NOT EXISTS message VARCHAR(300); -- why the asker wants to swap

@@ -9,6 +9,7 @@ import { queryOne } from "@/lib/db";
  *  - profile photos: the person themself, anyone in their clan, and the platform owner
  *  - identity documents (KYC): the person themself, their clan leader, and the platform owner who approves them
  *  - transfer slips: the member who uploaded it and their clan leader
+ *  - savings QR codes: approved members of the group; savings slips: the payer and that round's receiver
  *  - everything else (meeting minutes, payout proofs): signed-in users of the same clan
  * Anything not allowed answers 404, so ids can't be probed.
  */
@@ -74,6 +75,29 @@ async function canRead(
   if (file.purpose === "kyc_document") {
     if (file.uploaded_by === user.id || user.role === "super_admin") return true;
     return user.role === "clan_admin" && Boolean(file.clan_id) && file.clan_id === user.clanId;
+  }
+
+  // Savings groups cross clans, so their files are checked against the group, never a clan.
+  if (file.purpose === "savings_qr") {
+    if (file.uploaded_by === user.id) return true;
+    const member = await queryOne(
+      `SELECT 1 FROM savings_members owner
+         JOIN savings_members viewer ON viewer.group_id = owner.group_id AND viewer.user_id = $2 AND viewer.status = 'approved'
+        WHERE owner.qr_file_id = $1`,
+      [fileId, user.id],
+    );
+    return Boolean(member);
+  }
+  if (file.purpose === "savings_slip") {
+    if (file.uploaded_by === user.id) return true;
+    const receiver = await queryOne(
+      `SELECT 1 FROM savings_payments p
+         JOIN savings_rounds r ON r.id = p.round_id
+         JOIN savings_members m ON m.id = r.receiver_member_id
+        WHERE p.slip_file_id = $1 AND m.user_id = $2`,
+      [fileId, user.id],
+    );
+    return Boolean(receiver);
   }
 
   // An upload with no clan came from a general user; only they can open it.

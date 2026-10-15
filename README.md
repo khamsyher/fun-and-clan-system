@@ -70,7 +70,7 @@ A feature belongs to exactly one area. The tabs under the switcher are that area
 | Users (`/admin/users`) | Every account on the platform: name, phone, email, role, clan (or "no clan"), status and last sign-in. Searchable by name, phone, email or clan code, and filtered by kind (`?people=leaders`, `members`, `general`, `waiting`). From here the Super Admin can **block** an account (which signs that person out at once) or **delete** one, and **View details** opens the person's own page |
 | One person (`/admin/users/[id]`) | Everything about one account — profile and contact details, when they joined, who approved them, last sign-in, when the password last changed — with counts of their family, requests for help, donations, unpaid bills and slips, the history of what has been done to the account, and the actions: block, **reset the password** to a temporary one, and delete. Identity documents appear as **type and verified state only**: the number is masked and the scan is not linked |
 | Fund settings (`/clan/settings`) | Leader changes fund mode (A/B), amount and Mode A schedule. Each change needs a meeting date and the minutes (JPG/PNG/WebP/PDF, max 5 MB); every version is kept with its document |
-| Family (`/member/family`) | Member adds, edits and removes spouse, children and parents; the leader sees each member's family on `/clan` |
+| Family (`/account`) | A member keeps their household on their own account page, beside their details and documents: spouse, children and parents, added, edited and removed there. The leader sees each member’s family on `/clan` |
 | Events (`/clan/events`) | Leader reports a death (member or dependent). **Mode B:** one bill per member account at the locked rate; leader records cash/transfer payments (with undo); closing turns unpaid bills into debt that shows on the next bill, and records the platform fee. **Mode A:** payout comes from the central fund; the fee is taken on the payout |
 | Payouts | Leader requests → a **treasurer** (a member the leader assigns) approves or rejects with a reason → leader records it paid, with optional proof. The database forbids the same person requesting and approving |
 | Fund (`/clan/fund`) | Balance, money received (e.g. Mode A savings), outstanding debts with "record payment", and the full ledger |
@@ -130,6 +130,7 @@ lib/access.ts          what a signed-in person may do (used by pages and actions
 lib/i18n/              dictionaries (en, lo, hmn) + locale cookie helpers
 proxy.ts               optimistic route guard
 app/(auth)/            login + register
+app/account/           one person’s own page: details, identity documents, household, password
 app/admin|clan|member  role dashboards (admin/users: account management)
 app/actions/           server actions (auth, admin, clan)
 ```

@@ -9,7 +9,7 @@ export type NavArea = {
   href: string;
   label: string;
   note: string;
-  icon: "fund" | "donations";
+  icon: "fund" | "donations" | "savings";
   /** Paths that belong to this area, beyond its own sections. */
   owns: string[];
   sections: NavItem[];
@@ -56,7 +56,7 @@ export function AreaNav({ areas }: { areas: NavArea[] }) {
 }
 
 /** Drawn here rather than imported so the two areas read as a pair at a glance. */
-function AreaIcon({ name }: { name: NavArea["icon"] }) {
+export function AreaIcon({ name }: { name: NavArea["icon"] }) {
   const common = {
     width: 18,
     height: 18,
@@ -68,6 +68,15 @@ function AreaIcon({ name }: { name: NavArea["icon"] }) {
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
   };
+  if (name === "savings") {
+    return (
+      <svg {...common}>
+        <ellipse cx="12" cy="6.5" rx="7" ry="2.75" />
+        <path d="M5 6.5v5c0 1.5 3.1 2.75 7 2.75s7-1.25 7-2.75v-5" />
+        <path d="M5 11.5v5c0 1.5 3.1 2.75 7 2.75s7-1.25 7-2.75v-5" />
+      </svg>
+    );
+  }
   if (name === "donations") {
     return (
       <svg {...common}>

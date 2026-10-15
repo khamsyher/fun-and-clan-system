@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { createClan, updatePlatformFee } from "@/app/actions/admin";
+import { createClan, updatePlatformFee, updateSavingsFee } from "@/app/actions/admin";
 import { useT } from "@/components/i18n-provider";
 import { Field, Notice, SubmitButton } from "@/components/ui";
 import { PercentIcon } from "@/components/icons";
@@ -71,6 +71,32 @@ export function PlatformFeeForm({ current }: { current: string }) {
       />
       <SubmitButton variant="quiet" pendingLabel={a.saving} className="w-full">
         {a.saveFee}
+      </SubmitButton>
+    </form>
+  );
+}
+
+export function SavingsFeeForm({ current }: { current: string }) {
+  const [state, action] = useActionState(updateSavingsFee, undefined);
+  const a = useT().admin;
+  return (
+    <form action={action} className="space-y-4" noValidate>
+      {state?.success && <Notice tone="success">{state.success}</Notice>}
+      <Field
+        label={a.savingsFeeLabel}
+        name="fee"
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        min="0"
+        max="100"
+        icon={<PercentIcon width={18} height={18} />}
+        defaultValue={state?.values?.fee ?? Number(current)}
+        errors={state?.errors?.fee}
+        hint={a.savingsFeeHint}
+      />
+      <SubmitButton variant="quiet" pendingLabel={a.saving} className="w-full">
+        {a.saveSavingsFee}
       </SubmitButton>
     </form>
   );

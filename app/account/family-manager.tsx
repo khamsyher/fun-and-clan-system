@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { removeDependent, saveDependent } from "@/app/actions/family";
 import { useT } from "@/components/i18n-provider";
-import { UsersIcon } from "@/components/icons";
+import { buttonQuiet } from "@/components/button-styles";
+import { UserPlusIcon, UsersIcon } from "@/components/icons";
 import { Field, Notice, SelectField, SubmitButton } from "@/components/ui";
 import { fmt } from "@/lib/i18n/config";
 import { RELATIONSHIPS, type Relationship } from "@/lib/definitions";
@@ -16,66 +17,82 @@ export type DependentView = {
   dobLabel: string | null;
 };
 
+/**
+ * The household, on the page where someone keeps everything else about themself.
+ * Like the documents below it, the form is folded away until asked for: most people add
+ * their family once and afterwards only read it.
+ */
 export function FamilyManager({ dependents }: { dependents: DependentView[] }) {
   const t = useT().family;
   const [editing, setEditing] = useState<DependentView | null>(null);
+  const [adding, setAdding] = useState(false);
   const [removeState, removeAction] = useActionState(removeDependent, undefined);
   const [flash, setFlash] = useState<string | null>(null);
   const shown = flash ?? removeState?.success;
+  const open = adding || editing !== null;
+
+  const close = (message?: string) => {
+    if (message) setFlash(message);
+    setAdding(false);
+    setEditing(null);
+  };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-      <section>
-        <div className="mb-4 flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-ink">{t.title}</h2>
-          <span className="text-sm text-muted">{fmt(t.count, { n: dependents.length })}</span>
+    <div>
+      {shown && (
+        <div className="mb-4">
+          <Notice tone="success">{shown}</Notice>
         </div>
-        {shown && (
-          <div className="mb-4">
-            <Notice tone="success">{shown}</Notice>
-          </div>
-        )}
-        {dependents.length === 0 ? (
-          <div className="flex flex-col items-center rounded-xl border border-dashed border-line-strong bg-surface px-5 py-12 text-center">
-            <UsersIcon className="text-brand-bright" width={28} height={28} />
-            <p className="mt-3 font-medium text-ink">{t.empty}</p>
-            <p className="mt-1 max-w-xs text-sm text-ink-soft">{t.emptyBody}</p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-            {dependents.map((d) => (
-              <DependentRow
-                key={d.id}
-                dependent={d}
-                isEditing={editing?.id === d.id}
-                onEdit={() => {
-                  setFlash(null);
-                  setEditing(d);
-                }}
-                removeAction={(fd) => {
-                  setFlash(null);
-                  removeAction(fd);
-                }}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+      )}
 
-      <section className="h-fit rounded-xl border border-line bg-surface p-5 sm:p-6 lg:sticky lg:top-32">
-        <h2 className="text-lg font-semibold text-ink">{editing ? fmt(t.editTitle, { name: editing.fullName }) : t.addTitle}</h2>
-        <div className="mt-5">
-          {/* Remount on switch so the fields reload the chosen person. */}
-          <DependentForm
-            key={editing?.id ?? "new"}
-            editing={editing}
-            onDone={(message) => {
-              if (message) setFlash(message);
-              setEditing(null);
-            }}
-          />
+      {dependents.length > 0 && (
+        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+          {dependents.map((d) => (
+            <DependentRow
+              key={d.id}
+              dependent={d}
+              isEditing={editing?.id === d.id}
+              onEdit={() => {
+                setFlash(null);
+                setAdding(false);
+                setEditing(d);
+              }}
+              removeAction={(fd) => {
+                setFlash(null);
+                removeAction(fd);
+              }}
+            />
+          ))}
+        </ul>
+      )}
+
+      {open ? (
+        <div className="mt-4 rounded-xl border border-line bg-surface p-5 sm:p-6">
+          <h3 className="font-medium text-ink">{editing ? fmt(t.editTitle, { name: editing.fullName }) : t.addTitle}</h3>
+          <div className="mt-5">
+            {/* Remount on switch so the fields reload the chosen person. */}
+            <DependentForm key={editing?.id ?? "new"} editing={editing} onDone={close} />
+          </div>
         </div>
-      </section>
+      ) : dependents.length === 0 ? (
+        // Nobody on file: the empty state carries the invitation instead of apologising for itself.
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-brand-wash text-brand">
+            <UsersIcon width={24} height={24} />
+          </span>
+          <p className="mt-4 font-medium text-ink">{t.empty}</p>
+          <p className="mt-1 max-w-sm text-sm text-ink-soft">{t.emptyBody}</p>
+          <button type="button" onClick={() => setAdding(true)} className={`${buttonQuiet} mt-5`}>
+            <UserPlusIcon width={16} height={16} />
+            {t.add}
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className={`${buttonQuiet} mt-4`}>
+          <UserPlusIcon width={16} height={16} />
+          {t.addAnother}
+        </button>
+      )}
     </div>
   );
 }
@@ -135,7 +152,8 @@ function DependentRow({
 
 function DependentForm({ editing, onDone }: { editing: DependentView | null; onDone: (message?: string) => void }) {
   const [state, action] = useActionState(saveDependent, undefined);
-  const t = useT().family;
+  const tt = useT();
+  const t = tt.family;
   const formRef = useRef<HTMLFormElement>(null);
   const handled = useRef<unknown>(null);
   const v = state?.values;
@@ -147,37 +165,31 @@ function DependentForm({ editing, onDone }: { editing: DependentView | null; onD
     if (!state?.success || handled.current === state) return;
     handled.current = state;
     formRef.current?.reset();
-    if (editing) onDone(state.success);
-  }, [state, editing, onDone]);
+    // The saved person is in the list above, so the form folds away either way.
+    onDone(state.success);
+  }, [state, onDone]);
 
   return (
     <form ref={formRef} action={action} className="space-y-5" noValidate>
-      {state?.success && !editing && <Notice tone="success">{state.success}</Notice>}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       {editing && <input type="hidden" name="id" value={editing.id} />}
-      <Field label={t.fullName} name="fullName" autoComplete="off" defaultValue={v?.fullName ?? editing?.fullName} errors={e?.fullName} />
-      <SelectField
-        label={t.relationship}
-        name="relationship"
-        placeholder={t.choose}
-        defaultValue={v?.relationship ?? editing?.relationship ?? ""}
-        options={RELATIONSHIPS.map((r) => ({ value: r, label: t.rel[r] }))}
-        errors={e?.relationship}
-      />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label={t.fullName} name="fullName" autoComplete="off" defaultValue={v?.fullName ?? editing?.fullName} errors={e?.fullName} />
+        <SelectField
+          label={t.relationship}
+          name="relationship"
+          placeholder={t.choose}
+          defaultValue={v?.relationship ?? editing?.relationship ?? ""}
+          options={RELATIONSHIPS.map((r) => ({ value: r, label: t.rel[r] }))}
+          errors={e?.relationship}
+        />
+      </div>
       <Field label={t.dob} name="dob" type="date" max={today} optional defaultValue={v?.dob ?? editing?.dob} errors={e?.dob} />
-      <div className="flex gap-3">
-        {editing && (
-          <button
-            type="button"
-            onClick={() => onDone()}
-            className="inline-flex h-12 flex-1 items-center justify-center rounded-lg border border-line-strong bg-surface px-4 font-medium text-ink hover:bg-sunken"
-          >
-            {t.cancel}
-          </button>
-        )}
-        <SubmitButton pendingLabel={editing ? t.saving : t.adding} className="flex-[2]">
-          {editing ? t.save : t.add}
-        </SubmitButton>
+      <div className="flex flex-wrap items-center gap-3">
+        <SubmitButton pendingLabel={editing ? t.saving : t.adding}>{editing ? t.save : t.add}</SubmitButton>
+        <button type="button" onClick={() => onDone()} className="text-sm font-medium text-ink-soft hover:text-ink">
+          {tt.reset.cancel}
+        </button>
       </div>
     </form>
   );

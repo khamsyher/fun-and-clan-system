@@ -30,7 +30,23 @@ export type NotificationType =
   | "kyc_submitted"
   | "kyc_approved"
   | "kyc_rejected"
-  | "kyc_revoked";
+  | "kyc_revoked"
+  | "savings_join_request"
+  | "savings_join_approved"
+  | "savings_join_declined"
+  | "savings_round_open"
+  | "savings_your_turn"
+  | "savings_slip_uploaded"
+  | "savings_slip_confirmed"
+  | "savings_slip_rejected"
+  | "savings_reminder"
+  | "savings_round_done"
+  | "savings_completed"
+  | "savings_cancelled"
+  | "savings_swap_requested"
+  | "savings_swap_requested_note"
+  | "savings_swap_declined"
+  | "savings_swap_done";
 
 type Params = Record<string, string | number>;
 type Db = Pick<PoolClient, "query">;
