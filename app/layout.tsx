@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       default: brand.appName,
       template: `%s · ${brand.appName}`,
     },
-    description: "Funeral mutual-aid fund management for clans.",
+    description: "Mutual-aid fund management for clans.",
     ...(logo ? { icons: { icon: logo, apple: logo } } : {}),
   };
 }

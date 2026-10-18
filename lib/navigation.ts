@@ -51,6 +51,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
           { href: "/admin", label: t.nav.overview },
           { href: "/admin/clans", label: t.clansAdmin.title },
           { href: "/admin/fund", label: t.fundAdmin.title },
+          { href: "/admin/savings", label: t.savingsAdmin.title },
           { href: "/admin/users", label: t.nav.users },
           // The badge keeps the queue visible after the notification has been read.
           { href: "/admin/kyc", label: t.nav.kyc, badge: badges.kycWaiting },

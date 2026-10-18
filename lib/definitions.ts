@@ -73,13 +73,6 @@ export const loginSchema = (e: Errors) =>
 export const registerSchema = (e: Errors) =>
   z
     .object({
-      // Optional: left empty, the person registers as a general user and joins a clan later.
-      clanCode: z
-        .string()
-        .trim()
-        .toUpperCase()
-        .refine((v) => v === "" || /^[A-Z0-9-]{2,20}$/.test(v), { error: e.clanCodeFormat })
-        .transform((v) => (v === "" ? null : v)),
       fullName: z.string().trim().min(2, { error: e.fullNameRequired }).max(150),
       phone: phone(e),
       email: optionalText.pipe(z.email({ error: e.emailInvalid }).nullable()),

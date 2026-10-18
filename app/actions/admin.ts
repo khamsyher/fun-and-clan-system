@@ -337,7 +337,7 @@ export async function updateSavingsFee(_state: FormState, formData: FormData): P
     admin.id,
     JSON.stringify({ savings_fee_percent: rounded }),
   ]);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { success: fmt(t.admin.savingsFeeSaved, { fee: rounded }) };
 }
 
@@ -354,5 +354,5 @@ export async function markSavingsFeeReceived(formData: FormData) {
   if (updated[0]) {
     await query(`INSERT INTO audit_logs (actor_id, action, target_id) VALUES ($1, 'platform.savings_fee_received', $2)`, [admin.id, feeId]);
   }
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
 }

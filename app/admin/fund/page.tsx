@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeading, Section } from "@/components/app-shell";
 import { Pill } from "@/components/badge";
-import { markFeeReceived } from "@/app/actions/admin";
+import { markFeeReceived, markSavingsFeeReceived } from "@/app/actions/admin";
 import { requireRole } from "@/lib/dal";
 import { query, queryOne } from "@/lib/db";
 import { STAFF_ROLES } from "@/lib/definitions";
 import { formatDate, formatKip, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
-import { PlatformFeeForm } from "../forms";
+import { PlatformFeeForm, SavingsFeeForm } from "../forms";
 import { Stat } from "../stat";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,6 +28,19 @@ type ClanFund = {
   unpaid: string;
   fees_owed: string;
   open_events: string;
+};
+
+type SavingsFee = {
+  id: string;
+  group_name: string;
+  round_no: number;
+  receiver_name: string;
+  receiver_phone: string;
+  percent: string;
+  base_amount: string;
+  fee_amount: string;
+  status: "owed" | "received";
+  created_at: Date;
 };
 
 type Fee = {
@@ -54,8 +67,10 @@ export default async function AdminFundPage({ searchParams }: PageProps<"/admin/
   const f = t.fundAdmin;
   const feeFilter = sp.fees === "received" || sp.fees === "all" ? sp.fees : "owed";
 
-  const [settings, totals, clans, fees] = await Promise.all([
-    queryOne<{ platform_fee_percent: string }>(`SELECT platform_fee_percent FROM platform_settings WHERE id = 1`),
+  const [settings, totals, clans, fees, savingsFees, savingsTotals] = await Promise.all([
+    queryOne<{ platform_fee_percent: string; savings_fee_percent: string }>(
+      `SELECT platform_fee_percent, savings_fee_percent FROM platform_settings WHERE id = 1`,
+    ),
     queryOne<{ balance: string; collected: string; paid_out: string; unpaid: string; owed: string; received: string; collecting: string }>(
       `SELECT (SELECT COALESCE(SUM(amount), 0) FROM fund_ledger) AS balance,
               (SELECT COALESCE(SUM(amount), 0) FROM fund_ledger WHERE amount > 0) AS collected,
@@ -89,6 +104,24 @@ export default async function AdminFundPage({ searchParams }: PageProps<"/admin/
         LIMIT 200`,
       [feeFilter],
     ),
+    // Savings groups owe a fee on each pot, paid by that round's receiver.
+    query<SavingsFee>(
+      `SELECT f.id, g.name AS group_name, r.round_no, u.full_name AS receiver_name, u.phone AS receiver_phone,
+              f.percent, f.base_amount, f.fee_amount, f.status, f.created_at
+         FROM savings_fees f
+         JOIN savings_rounds r ON r.id = f.round_id
+         JOIN savings_groups g ON g.id = r.group_id
+         JOIN users u ON u.id = f.payer_user_id
+        WHERE $1 = 'all' OR f.status::text = $1
+        ORDER BY (f.status = 'owed') DESC, f.created_at DESC
+        LIMIT 200`,
+      [feeFilter],
+    ),
+    queryOne<{ owed: string; received: string }>(
+      `SELECT COALESCE(SUM(fee_amount) FILTER (WHERE status = 'owed'), 0) AS owed,
+              COALESCE(SUM(fee_amount) FILTER (WHERE status = 'received'), 0) AS received
+         FROM savings_fees`,
+    ),
   ]);
 
   return (
@@ -101,9 +134,11 @@ export default async function AdminFundPage({ searchParams }: PageProps<"/admin/
         <Stat label={f.paidOut} value={formatKip(totals?.paid_out ?? 0)} note={f.paidOutNote} />
         <Stat label={f.unpaid} value={formatKip(totals?.unpaid ?? 0)} note={fmt(f.unpaidNote, { n: formatNumber(totals?.collecting ?? 0) })} />
       </dl>
-      <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">
+      <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
         <Stat label={a.feesOwed} value={formatKip(totals?.owed ?? 0)} note={a.feesTitle} />
         <Stat label={a.feesReceived} value={formatKip(totals?.received ?? 0)} note={a.feesTitle} />
+        <Stat label={a.feesOwed} value={formatKip(savingsTotals?.owed ?? 0)} note={a.savingsFeesTitle} />
+        <Stat label={a.feesReceived} value={formatKip(savingsTotals?.received ?? 0)} note={a.savingsFeesTitle} />
       </dl>
 
       {/* The fee rule sits beside the fees it produces. */}
@@ -115,6 +150,12 @@ export default async function AdminFundPage({ searchParams }: PageProps<"/admin/
           </div>
         </Section>
       </div>
+
+      <Section title={a.savingsFeeTitle}>
+        <div className="max-w-md rounded-xl border border-line bg-surface p-5 sm:p-6">
+          <SavingsFeeForm current={settings?.savings_fee_percent ?? "1.00"} />
+        </div>
+      </Section>
 
       <Section title={f.byClan} aside={f.byClanAside}>
         {clans.length === 0 ? (
@@ -214,6 +255,59 @@ export default async function AdminFundPage({ searchParams }: PageProps<"/admin/
                     <td className="px-4 py-3 text-right">
                       {fee.status === "owed" && (
                         <form action={markFeeReceived}>
+                          <input type="hidden" name="feeId" value={fee.id} />
+                          <button type="submit" className="rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-ok hover:bg-ok-wash">
+                            {a.markReceived}
+                          </button>
+                        </form>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      {/* Same Owed / Received / All filter as the platform fees above. */}
+      <Section title={a.savingsFeesTitle}>
+        {savingsFees.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-6 text-center text-sm text-ink-soft">{a.noSavingsFees}</p>
+        ) : (
+          <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
+            <table className="w-full min-w-[40rem] text-left text-sm">
+              <thead className="border-b border-line bg-brand-wash/60 text-xs text-ink-soft">
+                <tr>
+                  <th className="px-4 py-3 font-medium">{a.colGroup}</th>
+                  <th className="px-4 py-3 text-right font-medium">{a.colBase}</th>
+                  <th className="px-4 py-3 text-right font-medium">{a.colFee}</th>
+                  <th className="px-4 py-3 font-medium">{a.colStatus}</th>
+                  <th className="px-4 py-3">
+                    <span className="sr-only">{a.markReceived}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {savingsFees.map((fee) => (
+                  <tr key={fee.id}>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-ink">{fee.group_name}</p>
+                      <p className="text-xs text-muted">
+                        {fmt(t.savings.roundNo, { n: fee.round_no })} · {fee.receiver_name} · {fee.receiver_phone} · {formatDate(fee.created_at, locale)}
+                      </p>
+                    </td>
+                    <td className="tabular px-4 py-3 text-right text-ink-soft">{formatKip(fee.base_amount)}</td>
+                    <td className="tabular px-4 py-3 text-right font-semibold text-ink">
+                      {formatKip(fee.fee_amount)}
+                      <span className="block text-xs font-normal text-muted">{Number(fee.percent)}%</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Pill tone={fee.status === "owed" ? "warn" : "ok"}>{a.feeStatus[fee.status]}</Pill>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {fee.status === "owed" && (
+                        <form action={markSavingsFeeReceived}>
                           <input type="hidden" name="feeId" value={fee.id} />
                           <button type="submit" className="rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-ok hover:bg-ok-wash">
                             {a.markReceived}

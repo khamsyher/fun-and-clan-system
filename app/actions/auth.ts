@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { query, queryOne } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, deleteSession } from "@/lib/session";
-import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
 import {
   loginSchema,
@@ -75,7 +74,6 @@ export async function login(_state: FormState, formData: FormData): Promise<Form
 export async function register(_state: FormState, formData: FormData): Promise<FormState> {
   const t = await getT();
   const values = pick(formData, [
-    "clanCode",
     "fullName",
     "phone",
     "email",
@@ -90,22 +88,8 @@ export async function register(_state: FormState, formData: FormData): Promise<F
   }
   const d = parsed.data;
 
-  // No clan code: they register as a general user, who sees only the donations area
-  // and can ask a clan to take them in later from their account page.
-  let clan: { id: string; name: string; is_active: boolean } | null = null;
-  if (d.clanCode) {
-    clan = await queryOne<{ id: string; name: string; is_active: boolean }>(
-      `SELECT id, name, is_active FROM clans WHERE code = $1`,
-      [d.clanCode],
-    );
-    if (!clan) {
-      return { errors: { clanCode: [t.auth.unknownClan] }, values: echo };
-    }
-    if (!clan.is_active) {
-      return { errors: { clanCode: [t.auth.clanInactive] }, values: echo };
-    }
-  }
-
+  // Everyone signs up as a general user, active at once. They join a clan later from their
+  // account page, where the clan's leader approves them; staff can also place them directly.
   const taken = await queryOne(`SELECT 1 FROM users WHERE phone = $1`, [d.phone]);
   if (taken) {
     return { errors: { phone: [t.auth.phoneTaken] }, values: echo };
@@ -120,27 +104,13 @@ export async function register(_state: FormState, formData: FormData): Promise<F
   const passwordHash = await hashPassword(d.password);
   const inserted = await queryOne<{ id: string }>(
     `INSERT INTO users (clan_id, role, status, full_name, phone, email, password_hash)
-     VALUES ($1, $2::user_role, $3::user_status, $4, $5, $6, $7)
+     VALUES (NULL, 'user', 'active', $1, $2, $3, $4)
      RETURNING id`,
-    [
-      clan?.id ?? null,
-      clan ? "member" : "user",
-      clan ? "pending" : "active", // a general user has nobody to approve them
-      d.fullName,
-      d.phone,
-      d.email,
-      passwordHash,
-    ],
+    [d.fullName, d.phone, d.email, passwordHash],
   );
-  await query(`INSERT INTO audit_logs (clan_id, actor_id, action, target_id) VALUES ($1, $2, $3, $2)`, [
-    clan?.id ?? null,
-    inserted!.id,
-    clan ? "member.registered" : "user.registered",
-  ]);
+  await query(`INSERT INTO audit_logs (actor_id, action, target_id) VALUES ($1, 'user.registered', $1)`, [inserted!.id]);
 
-  return clan
-    ? { success: fmt(t.auth.registered, { clan: clan.name }) }
-    : { success: t.auth.registeredNoClan, kind: "ready" };
+  return { success: t.auth.registeredNoClan };
 }
 
 export async function logout() {

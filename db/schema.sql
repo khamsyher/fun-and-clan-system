@@ -663,7 +663,6 @@ UPDATE user_documents SET status = 'approved' WHERE verified_at IS NOT NULL AND 
 CREATE INDEX IF NOT EXISTS user_documents_queue_idx ON user_documents (status, created_at);
 
 -- ===========================================================================
-<<<<<<< HEAD
 -- Rotating savings groups. Anyone signed in (not the platform owner) organizes a
 -- group; members join with its code. Each round every member transfers straight to
 -- that round's receiver, who confirms the slips; the receiver owes the platform a
@@ -804,7 +803,8 @@ CREATE TABLE IF NOT EXISTS savings_swaps (
 CREATE UNIQUE INDEX IF NOT EXISTS savings_swaps_one_open ON savings_swaps (from_member_id) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS savings_swaps_group_idx ON savings_swaps (group_id, status);
 ALTER TABLE savings_swaps ADD COLUMN IF NOT EXISTS message VARCHAR(300); -- why the asker wants to swap
-=======
+
+-- ===========================================================================
 -- Platform branding and clan types: the super admin sets the app's name, logo
 -- and colours, and keeps the list of clan types clans are grouped by.
 -- Additive and re-runnable.
@@ -840,4 +840,3 @@ ALTER TABLE users ADD CONSTRAINT users_clan_required CHECK (
   (role::text IN ('super_admin', 'support', 'user') AND clan_id IS NULL) OR
   (role::text IN ('clan_admin', 'member') AND clan_id IS NOT NULL)
 );
->>>>>>> db562b9d59c1899663c702d68d54bb2f8034871c

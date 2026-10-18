@@ -1,12 +1,7 @@
 "use client";
 
-<<<<<<< HEAD
-import { useActionState, useEffect, useRef } from "react";
-import { createClan, updatePlatformFee, updateSavingsFee } from "@/app/actions/admin";
-=======
 import { useActionState, useEffect, useRef, useState } from "react";
-import { createClan, setClanType, updatePlatformFee } from "@/app/actions/admin";
->>>>>>> db562b9d59c1899663c702d68d54bb2f8034871c
+import { createClan, setClanType, updatePlatformFee, updateSavingsFee } from "@/app/actions/admin";
 import { useT } from "@/components/i18n-provider";
 import { Field, Notice, SelectField, SubmitButton } from "@/components/ui";
 import { PercentIcon } from "@/components/icons";
@@ -152,7 +147,6 @@ export function PlatformFeeForm({ current }: { current: string }) {
   );
 }
 
-<<<<<<< HEAD
 export function SavingsFeeForm({ current }: { current: string }) {
   const [state, action] = useActionState(updateSavingsFee, undefined);
   const a = useT().admin;
@@ -175,7 +169,10 @@ export function SavingsFeeForm({ current }: { current: string }) {
       <SubmitButton variant="quiet" pendingLabel={a.saving} className="w-full">
         {a.saveSavingsFee}
       </SubmitButton>
-=======
+    </form>
+  );
+}
+
 /** Changes a clan's type straight from the clan list; saves as soon as a type is picked. */
 export function ClanTypeSelect({ clanId, current, types }: { clanId: string; current: string | null; types: ClanTypeOption[] }) {
   const ct = useT().clanTypes;
@@ -198,7 +195,6 @@ export function ClanTypeSelect({ clanId, current, types }: { clanId: string; cur
           </option>
         ))}
       </select>
->>>>>>> db562b9d59c1899663c702d68d54bb2f8034871c
     </form>
   );
 }
