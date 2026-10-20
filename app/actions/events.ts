@@ -51,7 +51,7 @@ export async function reportDeath(_state: FormState, formData: FormData): Promis
               await db.query<{ name: string; family_id: string; relationship: string }>(
                 `SELECT d.full_name AS name, d.member_id AS family_id, d.relationship FROM dependents d
                    JOIN users u ON u.id = d.member_id
-                  WHERE d.id = $1 AND d.clan_id = $2 AND d.is_active AND d.deceased_at IS NULL AND u.status = 'active'`,
+                  WHERE d.id = $1 AND u.clan_id = $2 AND u.role = 'member' AND d.is_active AND d.deceased_at IS NULL AND u.status = 'active'`,
                 [personId, leader.clanId],
               )
             ).rows[0];

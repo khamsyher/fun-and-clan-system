@@ -59,16 +59,14 @@ export async function login(_state: FormState, formData: FormData): Promise<Form
   if (user.status === "disabled") {
     return { message: t.auth.disabled, values: echo };
   }
-  // Only matters for someone who has a clan: a super admin and a general user have none.
-  if (user.clan_id && !user.clan_active) {
-    return { message: t.auth.clanDisabled, values: echo };
-  }
-
   await query(`UPDATE users SET last_login_at = now() WHERE id = $1`, [user.id]);
   await createSession(user.id, user.role, user.clan_id, user.session_version);
+  // A disabled clan doesn't stop anyone signing in: they land where a general user does,
+  // since that is what they are until the clan is enabled again (see withoutDisabledClan).
+  const home = user.clan_id && !user.clan_active ? ROLE_HOME.user : ROLE_HOME[user.role];
   // Return to the page they were sent from (e.g. a shared donation link), never off-site.
   const safeNext = next.startsWith("/") && !next.startsWith("//") && /^[\w\-/]*$/.test(next.slice(1));
-  redirect(safeNext ? next : ROLE_HOME[user.role]);
+  redirect(safeNext ? next : home);
 }
 
 export async function register(_state: FormState, formData: FormData): Promise<FormState> {

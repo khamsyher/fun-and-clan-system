@@ -177,7 +177,7 @@ export default async function AdminClansPage({ searchParams }: PageProps<"/admin
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-end gap-1">
-                            <ClanActiveButton clanId={row.id} active={row.is_active} labels={a} />
+                            <ClanActiveButton clanId={row.id} active={row.is_active} name={row.name} />
                             <Link
                               href={`/admin/clans/${row.id}`}
                               className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-brand hover:bg-brand-wash"

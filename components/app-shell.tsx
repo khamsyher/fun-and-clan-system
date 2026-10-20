@@ -5,23 +5,29 @@ import { getT } from "@/lib/i18n/server";
 import type { CurrentUser } from "@/lib/dal";
 import { isStaffRole } from "@/lib/definitions";
 import { BrandName } from "./brand";
-import { LogoutIcon } from "./icons";
+import { ChatIcon, LogoutIcon } from "./icons";
 import { LanguageSwitcher } from "./language-switcher";
 import { NotificationBell } from "./notification-bell";
 import { getLocale } from "@/lib/i18n/server";
 import { renderNotification } from "@/lib/notification-text";
 import { listNotifications, unreadCount } from "@/lib/notify";
 import { countPendingKyc } from "@/lib/kyc";
+import { countPendingLeaderRequests } from "@/lib/leader-requests";
+import { unreadForUser, unreadThreadsForStaff } from "@/lib/support";
 import { AreaNav } from "./area-nav";
 import { MobileNav, SideNav } from "./side-nav";
 import { areasFor } from "@/lib/navigation";
 export async function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
-  const [t, locale, recent, unread, kycWaiting] = await Promise.all([
+  const staff = isStaffRole(user.role);
+  const [t, locale, recent, unread, kycWaiting, leaderRequests, supportUnread] = await Promise.all([
     getT(),
     getLocale(),
     listNotifications(user.id, 8),
     unreadCount(user.id),
     isStaffRole(user.role) ? countPendingKyc() : 0,
+    isStaffRole(user.role) ? countPendingLeaderRequests() : 0,
+    // Staff: conversations waiting on them. Everyone else: replies they haven't read.
+    staff ? unreadThreadsForStaff() : unreadForUser(user.id),
   ]);
   const initials = user.fullName
     .split(/\s+/)
@@ -29,7 +35,7 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
     .map((p) => p[0]?.toUpperCase())
     .join("");
 
-  const areas = areasFor(user, t, { kycWaiting });
+  const areas = areasFor(user, t, { kycWaiting, leaderRequests, supportUnread });
 
   const controls = (
           <div className="flex items-center gap-2 sm:gap-3">
@@ -39,6 +45,19 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
             <div className="hidden sm:block">
               <LanguageSwitcher />
             </div>
+            <Link
+              href={staff ? "/admin/support" : "/support"}
+              aria-label={supportUnread ? `${t.support.title} (${supportUnread})` : t.support.title}
+              title={t.support.title}
+              className="relative flex size-9 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-sunken hover:text-ink"
+            >
+              <ChatIcon width={20} height={20} />
+              {supportUnread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-bad px-1 text-[0.65rem] font-semibold text-white tabular">
+                  {supportUnread > 9 ? "9+" : supportUnread}
+                </span>
+              )}
+            </Link>
             <NotificationBell items={recent.map((n) => renderNotification(n, t, locale))} unread={unread} />
             {/* Account left the tabs when they became feature areas, so the whole name block leads there. */}
             <Link href="/account" aria-label={t.nav.account} className="group flex items-center gap-3 rounded-full">

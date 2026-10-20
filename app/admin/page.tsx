@@ -23,8 +23,9 @@ export default async function AdminPage() {
   const a = t.admin;
 
   const [totals, settings, money, counts, savings] = await Promise.all([
-    queryOne<{ clans: string; active_clans: string; no_leader: string; members: string; pending: string }>(
+    queryOne<{ clans: string; active_clans: string; no_leader: string; members: string; pending: string; leader_requests: string }>(
       `SELECT (SELECT COUNT(*) FROM clans) AS clans,
+              (SELECT COUNT(*) FROM clan_leader_requests WHERE status = 'pending') AS leader_requests,
               (SELECT COUNT(*) FROM clans WHERE is_active) AS active_clans,
               (SELECT COUNT(*) FROM clans c WHERE c.is_active AND NOT EXISTS (
                  SELECT 1 FROM users u WHERE u.clan_id = c.id AND u.role = 'clan_admin' AND u.status = 'active')) AS no_leader,
@@ -74,7 +75,13 @@ export default async function AdminPage() {
           href="/admin/clans"
           title={t.clansAdmin.title}
           body={t.clansAdmin.cardBody}
-          alert={Number(totals?.no_leader ?? 0) > 0 ? fmt(t.clansAdmin.cardNoLeader, { n: totals?.no_leader ?? 0 }) : null}
+          alert={
+            Number(totals?.leader_requests ?? 0) > 0
+              ? fmt(t.leaderRequests.cardWaiting, { n: totals?.leader_requests ?? 0 })
+              : Number(totals?.no_leader ?? 0) > 0
+                ? fmt(t.clansAdmin.cardNoLeader, { n: totals?.no_leader ?? 0 })
+                : null
+          }
         />
         <AreaCard
           href="/admin/fund"

@@ -38,10 +38,10 @@ export async function saveDependent(_state: FormState, formData: FormData): Prom
 
   if (id) {
     const updated = await queryOne<{ id: string }>(
-      `UPDATE dependents SET full_name = $4, relationship = $5, date_of_birth = $6, updated_at = now()
-        WHERE id = $1 AND member_id = $2 AND clan_id = $3 AND is_active
+      `UPDATE dependents SET full_name = $3, relationship = $4, date_of_birth = $5, updated_at = now()
+        WHERE id = $1 AND member_id = $2 AND is_active
         RETURNING id`,
-      [id, me.id, me.clanId, fullName, relationship, dob || null],
+      [id, me.id, fullName, relationship, dob || null],
     );
     if (!updated) return { message: t.nameRequired, values };
     await audit(me.clanId, me.id, "dependent.updated", id);
@@ -70,9 +70,9 @@ export async function removeDependent(_state: FormState, formData: FormData): Pr
 
   const removed = await queryOne<{ full_name: string }>(
     `UPDATE dependents SET is_active = FALSE, updated_at = now()
-      WHERE id = $1 AND member_id = $2 AND clan_id = $3 AND is_active
+      WHERE id = $1 AND member_id = $2 AND is_active
       RETURNING full_name`,
-    [id, me.id, me.clanId],
+    [id, me.id],
   );
   if (!removed) return undefined;
   await audit(me.clanId, me.id, "dependent.removed", id);

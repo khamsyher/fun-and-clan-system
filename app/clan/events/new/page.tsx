@@ -32,7 +32,7 @@ export default async function NewEventPage() {
     query<{ id: string; full_name: string; relationship: Relationship; member_name: string }>(
       `SELECT d.id, d.full_name, d.relationship, u.full_name AS member_name
          FROM dependents d JOIN users u ON u.id = d.member_id
-        WHERE d.clan_id = $1 AND d.is_active AND d.deceased_at IS NULL AND u.status = 'active'
+        WHERE u.clan_id = $1 AND u.role = 'member' AND d.is_active AND d.deceased_at IS NULL AND u.status = 'active'
         ORDER BY u.full_name, d.full_name`,
       [leader.clanId],
     ),

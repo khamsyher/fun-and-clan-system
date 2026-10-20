@@ -51,7 +51,10 @@ export default async function ClanPage() {
       [leader.clanId],
     ),
     query<{ member_id: string; full_name: string; relationship: Relationship }>(
-      `SELECT member_id, full_name, relationship FROM dependents WHERE clan_id = $1 AND is_active ORDER BY created_at`,
+      `SELECT d.member_id, d.full_name, d.relationship
+         FROM dependents d JOIN users u ON u.id = d.member_id
+        WHERE u.clan_id = $1 AND u.role = 'member' AND d.is_active
+        ORDER BY d.created_at`,
       [leader.clanId],
     ),
     pendingJoinRequests(leader.clanId!),

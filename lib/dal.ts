@@ -22,6 +22,8 @@ export type CurrentUser = {
   photoFileId: string | null;
   /** True once the platform owner has approved one of their identity documents. */
   kycApproved: boolean;
+  /** The name of their clan while it is disabled; they act as a general user until it's back. */
+  suspendedClan: string | null;
 };
 
 /**
@@ -32,7 +34,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await readSession();
   if (!session) return null;
 
-  const user = await queryOne<CurrentUser>(
+  const user = await queryOne<Omit<CurrentUser, "suspendedClan">>(
     `SELECT u.id, u.role, u.status, u.full_name AS "fullName", u.phone, u.email,
             u.clan_id AS "clanId", c.name AS "clanName", c.code AS "clanCode",
             c.is_active AS "clanActive", u.session_version AS "sessionVersion",
@@ -46,12 +48,31 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   );
 
   if (!user || user.status !== "active") return null;
-  // Disabling a clan locks its people out at once. A super admin and a general user have no clan.
-  if (user.clanId && !user.clanActive) return null;
   // A password change or reset bumps the version, ending every older session.
   if (user.sessionVersion !== session.sessionVersion) return null;
-  return user;
+  return withoutDisabledClan(user);
 });
+
+/**
+ * While their clan is disabled, its leader and members still sign in, but as general users
+ * with no clan: the clan's pages, money and files are closed to them, donations and savings
+ * groups stay open. Nothing is changed in the database, so enabling the clan again gives
+ * everyone their role and clan back at once.
+ */
+export function withoutDisabledClan<U extends Omit<CurrentUser, "suspendedClan">>(user: U): CurrentUser {
+  if (!user.clanId || user.clanActive) return { ...user, suspendedClan: null };
+  return {
+    ...user,
+    role: "user",
+    clanId: null,
+    clanName: null,
+    clanCode: null,
+    clanActive: null,
+    clanFundMode: null,
+    isTreasurer: false,
+    suspendedClan: user.clanName,
+  };
+}
 
 /** Guard for pages and server actions: redirects unless the user has one of the roles (none = any signed-in user). */
 export async function requireRole(...roles: Role[]): Promise<CurrentUser> {

@@ -95,7 +95,7 @@ export default async function AdminClanPage({ params }: PageProps<"/admin/clans/
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <StatusBadge status={clan.is_active ? "enabled" : "off"} />
             {types.length > 0 && <ClanTypeSelect clanId={clan.id} current={clan.clan_type_id} types={types} />}
-            <ClanActiveButton clanId={clan.id} active={clan.is_active} labels={a} />
+            <ClanActiveButton clanId={clan.id} active={clan.is_active} name={clan.name} />
           </div>
         </PageHeading>
       </div>

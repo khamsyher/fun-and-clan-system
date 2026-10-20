@@ -9,7 +9,7 @@ const ROLE_AREAS: { prefix: string; roles: Role[] }[] = [
   { prefix: "/clan", roles: ["clan_admin"] },
   { prefix: "/member", roles: ["member"] },
 ];
-const SIGNED_IN = ["/account", "/files", "/donations", "/savings", "/notifications"];
+const SIGNED_IN = ["/account", "/files", "/donations", "/savings", "/notifications", "/support"];
 const GUEST_ONLY = ["/login", "/register"];
 
 export default async function proxy(req: NextRequest) {

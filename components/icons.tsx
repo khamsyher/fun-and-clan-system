@@ -124,6 +124,13 @@ export const ShareIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const ChatIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4.75 6.75a2 2 0 0 1 2-2h10.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H10l-4.25 3.5v-3.5h-1a2 2 0 0 1-2-2Z" />
+    <path d="M8.5 9.75h7M8.5 12.75h4.5" />
+  </Icon>
+);
+
 export const BellIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M6.25 9.75a5.75 5.75 0 0 1 11.5 0c0 3 .6 4.6 1.4 5.6.4.5 0 1.4-.7 1.4H5.55c-.7 0-1.1-.9-.7-1.4.8-1 1.4-2.6 1.4-5.6Z" />

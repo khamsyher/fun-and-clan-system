@@ -16,7 +16,7 @@ import type { Dictionary } from "./i18n/config";
  * To add a feature: add its page under the matching role folder in `app/`, then add one
  * line to the right `sections` list here. Nothing else decides what appears in the header.
  */
-export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?: number } = {}): NavArea[] {
+export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?: number; leaderRequests?: number; supportUnread?: number } = {}): NavArea[] {
   const donations: NavArea = {
     href: "/donations",
     label: t.nav.areaDonations,
@@ -49,10 +49,13 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
         owns: [],
         sections: [
           { href: "/admin", label: t.nav.overview },
-          { href: "/admin/clans", label: t.clansAdmin.title },
+          // The badge counts people waiting to hear whether they may set up a clan.
+          { href: "/admin/clans", label: t.clansAdmin.title, badge: badges.leaderRequests },
           { href: "/admin/fund", label: t.fundAdmin.title },
           { href: "/admin/savings", label: t.savingsAdmin.title },
           { href: "/admin/users", label: t.nav.users },
+          // Conversations with something unread from the person.
+          { href: "/admin/support", label: t.support.inboxTitle, badge: badges.supportUnread },
           // The badge keeps the queue visible after the notification has been read.
           { href: "/admin/kyc", label: t.nav.kyc, badge: badges.kycWaiting },
           { href: "/admin/reports", label: t.nav.reports },

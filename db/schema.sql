@@ -840,3 +840,63 @@ ALTER TABLE users ADD CONSTRAINT users_clan_required CHECK (
   (role::text IN ('super_admin', 'support', 'user') AND clan_id IS NULL) OR
   (role::text IN ('clan_admin', 'member') AND clan_id IS NOT NULL)
 );
+
+-- ===========================================================================
+-- Asking to lead a new clan: a verified general user proposes a clan that isn't
+-- on the platform yet; staff decide. Approving creates the clan with them as its
+-- leader. Additive and re-runnable.
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS clan_leader_requests (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  clan_name   VARCHAR(150) NOT NULL,
+  description VARCHAR(500),
+  reason      VARCHAR(500),                                     -- why they should lead it
+  status      join_status NOT NULL DEFAULT 'pending',
+  note        VARCHAR(300),                                     -- staff's reason when declined
+  clan_id     UUID REFERENCES clans(id) ON DELETE SET NULL,     -- the clan created on approval
+  decided_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  decided_at  TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One open request per person.
+CREATE UNIQUE INDEX IF NOT EXISTS clan_leader_requests_one_pending ON clan_leader_requests (user_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS clan_leader_requests_queue_idx ON clan_leader_requests (status, created_at);
+
+-- ===========================================================================
+-- A family list belongs to the person, not to a clan: anyone (not platform staff)
+-- can keep one, and the clan they are in now is the one that covers it. clan_id
+-- stays only as a record of the clan at the time an entry was added. Re-runnable.
+-- ===========================================================================
+ALTER TABLE dependents ALTER COLUMN clan_id DROP NOT NULL;
+CREATE INDEX IF NOT EXISTS dependents_owner_idx ON dependents (member_id) WHERE is_active;
+
+-- ===========================================================================
+-- Support chat: each person (not platform staff) has one conversation with the
+-- platform team. Messages travel live over a WebSocket and are stored here, so
+-- the history survives reloads and restarts. Additive and re-runnable.
+-- ===========================================================================
+DO $$ BEGIN
+  CREATE TYPE support_status AS ENUM ('open', 'closed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS support_threads (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id            UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  status             support_status NOT NULL DEFAULT 'open',
+  last_message_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  user_last_read_at  TIMESTAMPTZ NOT NULL DEFAULT now(),   -- what the person has seen
+  staff_last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(),   -- what the platform team has seen
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS support_threads_inbox_idx ON support_threads (status, last_message_at DESC);
+
+CREATE TABLE IF NOT EXISTS support_messages (
+  id         BIGSERIAL PRIMARY KEY,
+  thread_id  UUID NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+  sender_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+  from_staff BOOLEAN NOT NULL,
+  body       VARCHAR(2000) NOT NULL CHECK (length(btrim(body)) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS support_messages_thread_idx ON support_messages (thread_id, id);

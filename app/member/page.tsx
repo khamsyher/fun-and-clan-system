@@ -36,9 +36,9 @@ export default async function MemberPage() {
     ),
     query<{ full_name: string; relationship: Relationship }>(
       `SELECT full_name, relationship FROM dependents
-        WHERE member_id = $1 AND clan_id = $2 AND is_active
+        WHERE member_id = $1 AND is_active
         ORDER BY created_at`,
-      [me.id, me.clanId],
+      [me.id],
     ),
     memberDebt(me.clanId!, me.id),
     listEvents(me.clanId!),

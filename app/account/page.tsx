@@ -7,6 +7,9 @@ import { ProfileFacts } from "@/components/profile-facts";
 import { ProfileEditor } from "./profile-editor";
 import { Avatar } from "@/components/profile-facts";
 import { withdrawJoinRequest } from "@/app/actions/membership";
+import { withdrawLeaderRequest } from "@/app/actions/leader-requests";
+import { latestLeaderRequest } from "@/lib/leader-requests";
+import { LeadClanForm } from "./lead-clan-form";
 import { requireRole } from "@/lib/dal";
 import { canJoinClan, canManageFamily } from "@/lib/access";
 import { listDependents } from "@/lib/family";
@@ -28,15 +31,17 @@ export default async function AccountPage() {
   const user = await requireRole();
   // The locale comes first: the family list formats its dates with it.
   const locale = await getLocale();
-  const [t, profile, documents, join, family] = await Promise.all([
+  const [t, profile, documents, join, family, lead] = await Promise.all([
     getT(),
     getProfile(user.id),
     listDocuments(user.id),
     // Only a general user can be waiting to join a clan; only a member has a household here.
     user.role === "user" ? latestJoinRequest(user.id) : null,
-    canManageFamily(user) ? listDependents(user.id, user.clanId, locale) : [],
+    canManageFamily(user) ? listDependents(user.id, locale) : [],
+    user.role === "user" ? latestLeaderRequest(user.id) : null,
   ]);
   const a = t.account;
+  const l = t.leaderRequests;
   const p = t.profile;
   const kyc = overallKyc(documents);
 
@@ -46,6 +51,14 @@ export default async function AccountPage() {
 
       {/* Until an identity is confirmed, say so before anything else: it is what holds them up. */}
       {kyc !== "approved" && <KycWarning state={kyc} t={t} />}
+
+      {/* Their clan is switched off: say why the clan pages are gone, and that it is temporary. */}
+      {user.suspendedClan && (
+        <div className="mt-6 rounded-xl border border-warn/30 bg-warn-wash px-5 py-4 text-sm text-warn" role="status">
+          <p className="font-medium">{fmt(a.clanSuspendedTitle, { clan: user.suspendedClan })}</p>
+          <p className="mt-1">{a.clanSuspendedBody}</p>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="min-w-0 space-y-6">
@@ -87,7 +100,7 @@ export default async function AccountPage() {
                 <h2 className="text-lg font-semibold text-ink">{t.family.title}</h2>
                 {family.length > 0 && <span className="text-sm text-muted">{fmt(t.family.count, { n: family.length })}</span>}
               </div>
-              <p className="mb-4 max-w-[65ch] text-sm text-ink-soft">{t.family.lede}</p>
+              <p className="mb-4 max-w-[65ch] text-sm text-ink-soft">{user.role === "member" ? t.family.lede : t.family.ledeNoClan}</p>
               <FamilyManager dependents={family} />
             </section>
           )}
@@ -127,7 +140,7 @@ export default async function AccountPage() {
             </div>
           </dl>
 
-          {user.role === "user" && (
+          {user.role === "user" && !user.suspendedClan && (
             <div className="rounded-xl border border-line bg-surface p-5 sm:p-6">
               <h2 className="font-display text-xl text-brand-deep">{a.joinTitle}</h2>
               <p className="mt-1 text-sm text-ink-soft">{a.joinBody}</p>
@@ -156,6 +169,41 @@ export default async function AccountPage() {
                     </div>
                   )}
                   <JoinClanForm />
+                </>
+              )}
+            </div>
+          )}
+
+          {/* No clan to join yet? A verified person can propose one and ask to lead it; staff decide. */}
+          {user.role === "user" && !user.suspendedClan && (
+            <div className="rounded-xl border border-line bg-surface p-5 sm:p-6">
+              <h2 className="font-display text-xl text-brand-deep">{l.title}</h2>
+              <p className="mt-1 text-sm text-ink-soft">{l.body}</p>
+
+              {lead?.status === "pending" ? (
+                <div className="mt-4 rounded-lg bg-warn-wash px-4 py-3 text-sm text-warn">
+                  <p className="font-medium">{fmt(l.waiting, { clan: lead.clan_name })}</p>
+                  <p className="mt-0.5 text-xs">{fmt(a.joinAskedOn, { date: formatDate(lead.created_at, locale) })}</p>
+                  <form action={withdrawLeaderRequest}>
+                    <button type="submit" className="mt-2 text-sm font-semibold text-brand underline-offset-2 hover:underline">
+                      {l.withdraw}
+                    </button>
+                  </form>
+                </div>
+              ) : !canJoinClan(user) ? (
+                <div className="mt-4 rounded-lg bg-warn-wash px-4 py-3 text-sm text-warn">
+                  <p className="font-medium">{t.kyc.needForClan}</p>
+                  <p className="mt-0.5 text-xs">{t.kyc.needHint}</p>
+                </div>
+              ) : (
+                <>
+                  {lead?.status === "rejected" && (
+                    <div className="mt-4 rounded-lg bg-bad-wash px-4 py-3 text-sm text-bad">
+                      <p className="font-medium">{fmt(l.declinedMine, { clan: lead.clan_name })}</p>
+                      {lead.note && <p className="mt-0.5">{lead.note}</p>}
+                    </div>
+                  )}
+                  <LeadClanForm />
                 </>
               )}
             </div>

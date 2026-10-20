@@ -30,15 +30,17 @@ export function canAskForHelp(user: CurrentUser) {
 
 /** Joining a clan puts a real person on a clan's roll, so the platform checks them first. */
 export function canJoinClan(user: CurrentUser) {
-  return user.role === "user" && user.kycApproved;
+  // Someone whose clan is only switched off still belongs to it, so they can't ask for another.
+  return user.role === "user" && user.kycApproved && !user.suspendedClan;
 }
 
 /**
- * A household list only matters where a fund covers it, so it stays with the members a clan
- * collects for. Nobody else — the platform owner and a clanless user have no fund behind them.
+ * Anyone can keep a family list except platform staff: it belongs to the person, not to a
+ * clan. Which clan covers it is decided by the clan they are in now — so a general user's
+ * family is covered the day they join one, and nothing is lost if they move.
  */
 export function canManageFamily(user: CurrentUser) {
-  return user.role === "member";
+  return isDonor(user);
 }
 
 /** Identity decisions rest with the platform, never with the clan that benefits from them. */

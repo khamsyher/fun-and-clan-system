@@ -1,5 +1,3 @@
-import { setClanActive } from "@/app/actions/admin";
-
 /** One figure in a row of figures; `highlight` gives it the brand panel. */
 export function Stat({ label, value, note, highlight }: { label: string; value: string; note?: string; highlight?: boolean }) {
   return (
@@ -11,20 +9,4 @@ export function Stat({ label, value, note, highlight }: { label: string; value: 
   );
 }
 
-/** Enables or disables a clan. Disabling locks its people out at once. */
-export function ClanActiveButton({ clanId, active, labels }: { clanId: string; active: boolean; labels: { enable: string; disable: string } }) {
-  return (
-    <form action={setClanActive}>
-      <input type="hidden" name="clanId" value={clanId} />
-      <input type="hidden" name="active" value={String(!active)} />
-      <button
-        type="submit"
-        className={`rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
-          active ? "text-bad hover:bg-bad-wash" : "text-ok hover:bg-ok-wash"
-        }`}
-      >
-        {active ? labels.disable : labels.enable}
-      </button>
-    </form>
-  );
-}
+export { ClanActiveButton } from "./clan-active-button";
