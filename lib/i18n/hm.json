@@ -7,7 +7,8 @@
     "language": "Lus",
     "chooseFile": "Xaiv ib daim ntawv",
     "menu": "Cov ntawv qhia",
-    "closeMenu": "Kaw cov ntawv qhia"
+    "closeMenu": "Kaw cov ntawv qhia",
+    "fileTooBig": "Daim ntawv no loj {size} MB. Thov xaiv ib daim me dua 5 MB."
   },
   "roles": {
     "super_admin": "Tus Saib Xyuas Loj",

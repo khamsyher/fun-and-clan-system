@@ -7,7 +7,8 @@
     "language": "ພາສາ",
     "chooseFile": "ເລືອກໄຟລ໌",
     "menu": "ເມນູ",
-    "closeMenu": "ປິດເມນູ"
+    "closeMenu": "ປິດເມນູ",
+    "fileTooBig": "ໄຟລ໌ນີ້ມີຂະໜາດ {size} MB. ກະລຸນາເລືອກໄຟລ໌ທີ່ນ້ອຍກວ່າ 5 MB."
   },
   "roles": {
     "super_admin": "ຜູ້ດູແລລະບົບ",

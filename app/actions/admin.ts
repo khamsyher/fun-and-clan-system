@@ -324,7 +324,7 @@ export async function setClanType(formData: FormData) {
 
 /** The savings group fee is separate from the funeral fee; each group keeps the rate it started with. */
 export async function updateSavingsFee(_state: FormState, formData: FormData): Promise<FormState> {
-  const admin = await requireRole("super_admin");
+  const admin = await requireRole(...STAFF_ROLES);
   const t = await getT();
   const raw = String(formData.get("fee") ?? "").trim();
   const fee = Number(raw);
@@ -343,7 +343,7 @@ export async function updateSavingsFee(_state: FormState, formData: FormData): P
 
 /** The system owner confirms a savings round's fee arrived. */
 export async function markSavingsFeeReceived(formData: FormData) {
-  const admin = await requireRole("super_admin");
+  const admin = await requireRole(...STAFF_ROLES);
   const feeId = String(formData.get("feeId") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(feeId)) return;
   const updated = await query<{ id: string }>(
