@@ -8,8 +8,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.*.*"],
   experimental: {
     serverActions: {
-      // Meeting minutes (and later transfer slips) are up to 5 MB; leave room for multipart overhead.
-      bodySizeLimit: "6mb",
+      // Each file is up to 5 MB (lib/upload-limits.ts) and a donation request can carry two
+      // (photo + QR), so allow both plus the form fields and multipart overhead.
+      bodySizeLimit: "12mb",
     },
   },
   // pdfkit reads its own font metrics from disk and exceljs is large; load both with plain Node require.

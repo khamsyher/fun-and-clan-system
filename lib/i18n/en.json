@@ -7,7 +7,8 @@
     "language": "Language",
     "chooseFile": "Choose a file",
     "menu": "Menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "fileTooBig": "This file is {size} MB. Please choose one under 5 MB."
   },
   "roles": {
     "super_admin": "Super Admin",

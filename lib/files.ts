@@ -1,6 +1,8 @@
 import "server-only";
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+import { MAX_UPLOAD_BYTES } from "./upload-limits";
+
+export { MAX_UPLOAD_BYTES };
 
 type Detected = { contentType: string; ext: string };
 

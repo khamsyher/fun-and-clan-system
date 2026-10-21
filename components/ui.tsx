@@ -14,6 +14,8 @@ import { useFormStatus } from "react-dom";
 import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon, UploadIcon } from "./icons";
 import { useT } from "./i18n-provider";
 import { buttonPrimary, buttonQuiet } from "./button-styles";
+import { fmt } from "@/lib/i18n/config";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
 
 type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -249,9 +251,25 @@ export function FileField({
   chooseLabel: string;
 }) {
   const id = useId();
+  const t = useT();
   const [fileName, setFileName] = useState<string | null>(null);
+  // Caught here, before upload: an oversized file would otherwise fail the whole form on the server.
+  const [tooBig, setTooBig] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const invalid = Boolean(errors?.length);
+  const shown = tooBig ? [tooBig] : errors;
+  const invalid = Boolean(shown?.length);
+
+  const choose = (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    if (file && file.size > MAX_UPLOAD_BYTES) {
+      input.value = "";
+      setFileName(null);
+      setTooBig(fmt(t.common.fileTooBig, { size: (file.size / 1024 / 1024).toFixed(1) }));
+      return;
+    }
+    setTooBig(null);
+    setFileName(file?.name ?? null);
+  };
 
   // Forget the chosen name when the form resets (React resets forms after a successful action).
   useEffect(() => {
@@ -263,7 +281,7 @@ export function FileField({
   }, []);
 
   return (
-    <FieldShell id={id} label={label} hint={hint} errors={errors}>
+    <FieldShell id={id} label={label} hint={hint} errors={shown}>
       <label
         htmlFor={id}
         className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3.5 py-3 transition-colors hover:border-brand-bright hover:bg-brand-wash/40 focus-within:border-brand-bright focus-within:ring-4 focus-within:ring-brand-bright/15 ${
@@ -281,8 +299,8 @@ export function FileField({
           type="file"
           accept={accept}
           className="sr-only"
-          aria-describedby={describe(id, hint, errors)}
-          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          aria-describedby={describe(id, hint, shown)}
+          onChange={(e) => choose(e.currentTarget)}
         />
       </label>
     </FieldShell>
