@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { query, queryOne, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
+import { needsIdentityCheck } from "@/lib/access";
 import { readUpload, type UploadCheck } from "@/lib/files";
 import { direct, notify, notifyMany, superAdminIds } from "@/lib/notify";
 import { getT } from "@/lib/i18n/server";
@@ -104,6 +105,7 @@ export async function updateProfile(_state: FormState, formData: FormData): Prom
 export async function addDocument(_state: FormState, formData: FormData): Promise<FormState> {
   const me = await requireRole();
   const t = await getT();
+  if (!needsIdentityCheck(me)) return { message: t.kyc.notRequiredBody };
   const values = pick(formData, ["docType", "docNumber", "issuedOn", "expiresOn", "note"]);
   const parsed = documentSchema(t.errors).safeParse(values);
   if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors, values };

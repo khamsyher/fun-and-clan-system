@@ -37,6 +37,13 @@ export function KycBadge({ state, t }: { state: KycState; t: Dictionary }) {
   );
 }
 
+/** For platform staff, who are never asked to verify their identity. */
+export function KycNotRequired({ t }: { t: Dictionary }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-3 py-1 text-sm font-semibold text-ink-soft">{t.kyc.notRequired}</span>
+  );
+}
+
 /** The coloured mark that opens each document row. */
 export function KycMark({ status }: { status: KycStatus }) {
   const look = LOOK[status];

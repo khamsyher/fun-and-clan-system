@@ -687,6 +687,14 @@
     "viaSlip": "Daim ntawv xa nyiaj"
   },
   "reports": {
+    "savingsTitle": "Pab pawg txuag nyiaj",
+    "savingsAside": "{n} pab pawg · {fresh} tshiab hauv lub sij hawm no",
+    "savingsLede": "Txhua pab pawg txuag nyiaj uas muaj txog thaum kawg ntawm lub sij hawm, nrog rau yam tshwm sim hauv lub sij hawm. Cov tswv cuab them ib leeg ncaj qha; platform tau tus nqi ntawm txhua zaug tiav.",
+    "colRoundsDone": "Zaug tiav",
+    "colPaidBetween": "Them ntawm cov tswv cuab",
+    "newInPeriod": "Tshiab",
+    "noSavings": "Tsis muaj pab pawg txuag nyiaj hauv lub sij hawm no.",
+    "sheetSavings": "Pab pawg txuag nyiaj",
     "metaTitle": "Daim ntawv qhia",
     "title": "Daim ntawv qhia nyiaj",
     "lede": "Nyiaj los thiab nyiaj tawm ntawm xeem lub nyiaj rau txhua lub sij hawm, npaj rau kev sib tham.",
@@ -1204,6 +1212,8 @@
     "docFinal": "Thaum xa lawm, daim ntawv nyob hauv koj tus account mus li. Yog muaj teeb meem, lub platform tsis txais thiab koj ntxiv dua ib daim."
   },
   "kyc": {
+    "notRequired": "Tsis tas (neeg ua haujlwm platform)",
+    "notRequiredBody": "Cov neeg ua haujlwm platform tsis tas txheeb tus kheej.",
     "metaTitle": "Kuaj tus kheej",
     "title": "Kuaj tus kheej",
     "lede": "Pom zoo los tsis pom zoo cov ntawv pov thawj tus kheej uas tib neeg xa tuaj. Daim ntawv pom zoo lawm thiaj koom tau ib xeem thiab thov tau nyiaj pab.",
@@ -1246,6 +1256,19 @@
     "bannerBodyNone": "Yuav tsum muaj ib daim pom zoo lawm ua ntej koj koom tau ib xeem los yog thov tau nyiaj pab.",
     "bannerBodyPending": "Thaum kuaj tas, koj yuav paub tam sim ntawd.",
     "bannerBodyRejected": "Ntxiv dua ib daim ntawv, ces yuav kuaj dua."
+  },
+  "charts": {
+    "empty": "Tseem tsis tau muaj dab tsi hauv 12 lub hlis no.",
+    "title": "Kev hloov",
+    "aside": "12 lub hlis dhau los",
+    "moneyTitle": "Nyiaj nkag rau cov xeem cov nyiaj",
+    "moneyNote": "Sau nyiaj, nyiaj pab thiab nyiaj tso ntawm txhua lub xeem, ib hlis (₭).",
+    "accountsTitle": "Account tshiab",
+    "accountsNote": "Cov neeg nkag platform txhua hli (tsis suav neeg ua haujlwm).",
+    "clansTitle": "Cov xeem loj tshaj",
+    "clansNote": "Cov thawj thiab tswv cuab uas siv hauv txhua lub xeem qhib. Nias ib lub xeem kom qhib.",
+    "showTable": "Saib ua rooj",
+    "colMonth": "Hli"
   },
   "support": {
     "title": "Kev pab",

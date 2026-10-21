@@ -43,6 +43,14 @@ export function canManageFamily(user: CurrentUser) {
   return isDonor(user);
 }
 
+/**
+ * Platform staff (the owner and support) run the identity checks; they don't go through one.
+ * Everyone else verifies their identity before joining a clan or asking for donations.
+ */
+export function needsIdentityCheck(user: CurrentUser) {
+  return !isStaff(user);
+}
+
 /** Identity decisions rest with the platform, never with the clan that benefits from them. */
 export function canReviewKyc(user: CurrentUser) {
   return isStaff(user);

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHeading } from "@/components/app-shell";
 import { StatusBadge } from "@/components/badge";
 import { DocumentList } from "@/components/document-list";
-import { KycBadge, KycWarning, kycLine, overallKyc } from "@/components/kyc-status";
+import { KycBadge, KycNotRequired, KycWarning, kycLine, overallKyc } from "@/components/kyc-status";
 import { ProfileFacts } from "@/components/profile-facts";
 import { ProfileEditor } from "./profile-editor";
 import { Avatar } from "@/components/profile-facts";
@@ -11,7 +11,7 @@ import { withdrawLeaderRequest } from "@/app/actions/leader-requests";
 import { latestLeaderRequest } from "@/lib/leader-requests";
 import { LeadClanForm } from "./lead-clan-form";
 import { requireRole } from "@/lib/dal";
-import { canJoinClan, canManageFamily } from "@/lib/access";
+import { canJoinClan, canManageFamily, needsIdentityCheck } from "@/lib/access";
 import { listDependents } from "@/lib/family";
 import { formatDate } from "@/lib/format";
 import { latestJoinRequest } from "@/lib/membership";
@@ -44,13 +44,14 @@ export default async function AccountPage() {
   const l = t.leaderRequests;
   const p = t.profile;
   const kyc = overallKyc(documents);
+  const verifies = needsIdentityCheck(user);
 
   return (
     <>
       <PageHeading title={a.title} lede={p.lede} />
 
       {/* Until an identity is confirmed, say so before anything else: it is what holds them up. */}
-      {kyc !== "approved" && <KycWarning state={kyc} t={t} />}
+      {verifies && kyc !== "approved" && <KycWarning state={kyc} t={t} />}
 
       {/* Their clan is switched off: say why the clan pages are gone, and that it is temporary. */}
       {user.suspendedClan && (
@@ -81,6 +82,7 @@ export default async function AccountPage() {
             }}
           />
 
+          {verifies && (
           <section id="identity" className="mt-12 min-w-0 scroll-mt-28">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-ink">{p.documents}</h2>
@@ -91,6 +93,7 @@ export default async function AccountPage() {
             {documents.length > 0 && <DocumentList docs={documents} t={t} locale={locale} canOpenFile emptyText={p.noDocuments} />}
             <DocumentForm hasDocuments={documents.length > 0} />
           </section>
+          )}
 
           {/* The household this fund covers. It lives beside their own details, because it is
               part of who they are here rather than a separate errand. */}
@@ -128,9 +131,7 @@ export default async function AccountPage() {
             </div>
             <div className="mt-4">
               <dt className="text-muted">{t.kyc.mineLabel}</dt>
-              <dd className="mt-1">
-                <KycBadge state={kyc} t={t} />
-              </dd>
+              <dd className="mt-1">{verifies ? <KycBadge state={kyc} t={t} /> : <KycNotRequired t={t} />}</dd>
             </div>
             <div className="mt-4">
               <dt className="text-muted">{t.member.clan}</dt>

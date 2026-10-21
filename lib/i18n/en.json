@@ -687,6 +687,14 @@
     "viaSlip": "Transfer slip"
   },
   "reports": {
+    "savingsTitle": "Savings groups",
+    "savingsAside": "{n} groups · {fresh} new in this period",
+    "savingsLede": "Every savings group that existed by the end of the period, with what happened in it during the period. Members pay each other directly; the platform's share is the fee on each finished round.",
+    "colRoundsDone": "Rounds finished",
+    "colPaidBetween": "Paid between members",
+    "newInPeriod": "New",
+    "noSavings": "No savings groups in this period.",
+    "sheetSavings": "Savings groups",
     "metaTitle": "Reports",
     "title": "Account report",
     "lede": "Income and expenses of the clan fund for any period, ready to share at meetings.",
@@ -1204,6 +1212,8 @@
     "docFinal": "Once sent, a document stays on your account. If something is wrong with it, the platform turns it down and you add another."
   },
   "kyc": {
+    "notRequired": "Not required (platform staff)",
+    "notRequiredBody": "Platform staff don't need to verify their identity.",
     "metaTitle": "Identity checks",
     "title": "Identity checks",
     "lede": "Approve or turn down the identity documents people send. An approved document is what lets someone join a clan and ask for donations.",
@@ -1246,6 +1256,19 @@
     "bannerBodyNone": "You need an approved document before you can join a clan or ask for donations.",
     "bannerBodyPending": "You will be told as soon as it has been looked at.",
     "bannerBodyRejected": "Add another document and it will be looked at again."
+  },
+  "charts": {
+    "empty": "Nothing recorded in these 12 months yet.",
+    "title": "Trends",
+    "aside": "Last 12 months",
+    "moneyTitle": "Money paid into clan funds",
+    "moneyNote": "Collections, contributions and deposits across every clan, per month (₭).",
+    "accountsTitle": "New accounts",
+    "accountsNote": "People who joined the platform each month (staff not counted).",
+    "clansTitle": "Largest clans",
+    "clansNote": "Active leaders and members in each enabled clan. Click a clan to open it.",
+    "showTable": "Show as table",
+    "colMonth": "Month"
   },
   "support": {
     "title": "Support",

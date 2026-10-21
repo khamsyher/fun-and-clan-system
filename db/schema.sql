@@ -566,8 +566,10 @@ ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'user';
 -- Written as role::text on purpose: PostgreSQL refuses to use an enum value in the
 -- same transaction that added it, and db/schema.sql is applied in one go.
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_clan_required;
+-- 'support' is listed here too (it is added further down): this runs again on every setup,
+-- and must not reject support staff who already exist.
 ALTER TABLE users ADD CONSTRAINT users_clan_required CHECK (
-  (role::text IN ('super_admin', 'user') AND clan_id IS NULL) OR
+  (role::text IN ('super_admin', 'support', 'user') AND clan_id IS NULL) OR
   (role::text IN ('clan_admin', 'member') AND clan_id IS NOT NULL)
 );
 

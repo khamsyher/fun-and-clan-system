@@ -7,7 +7,9 @@ import { STAFF_ROLES } from "@/lib/definitions";
 import { queryOne } from "@/lib/db";
 import { formatKip, formatNumber } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
-import { getT } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { MonthlyColumns, RankedBars } from "@/components/charts";
+import { membersByClan, moneyInByMonth, newAccountsByMonth } from "@/lib/dashboard-charts";
 import { countPeople } from "@/lib/users";
 import { PeopleCard } from "./people-card";
 import { Stat } from "./stat";
@@ -19,7 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
 /** The platform at a glance. Clans, the fund and users each have their own page for the work itself. */
 export default async function AdminPage() {
   await requireRole(...STAFF_ROLES);
-  const t = await getT();
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  // The trends below: last 12 months, and the largest clans.
+  const [moneyIn, accounts, clanSizes] = await Promise.all([moneyInByMonth(locale), newAccountsByMonth(locale), membersByClan()]);
   const a = t.admin;
 
   const [totals, settings, money, counts, savings] = await Promise.all([
@@ -68,6 +72,22 @@ export default async function AdminPage() {
         <Stat label={a.feesOwed} value={formatKip(money?.owed ?? 0)} note={a.feesTitle} />
         <Stat label={a.feesReceived} value={formatKip(money?.received ?? 0)} note={a.feesTitle} />
       </dl>
+
+      <Section title={t.charts.title} aside={t.charts.aside}>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ChartCard title={t.charts.moneyTitle} note={t.charts.moneyNote}>
+            <MonthlyColumns points={moneyIn} kind="kip" caption={t.charts.moneyTitle} />
+          </ChartCard>
+          <ChartCard title={t.charts.accountsTitle} note={t.charts.accountsNote}>
+            <MonthlyColumns points={accounts} kind="count" caption={t.charts.accountsTitle} />
+          </ChartCard>
+          <div className="lg:col-span-2">
+            <ChartCard title={t.charts.clansTitle} note={t.charts.clansNote}>
+              <RankedBars rows={clanSizes} hrefBase="/admin/clans/" empty={t.admin.noClans} />
+            </ChartCard>
+          </div>
+        </div>
+      </Section>
 
       {/* Where the work is: each card opens the page for it, with what needs attention. */}
       <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -129,5 +149,16 @@ function AreaCard({ href, title, body, alert }: { href: string; title: string; b
       </span>
       <ArrowRightIcon width={18} height={18} className="mt-1 shrink-0 text-brand transition-transform group-hover:translate-x-0.5" />
     </Link>
+  );
+}
+
+/** One chart with its title (which names the single series, so no legend is needed). */
+function ChartCard({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-line bg-surface p-5">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+      <p className="mt-0.5 mb-4 text-xs text-muted">{note}</p>
+      {children}
+    </div>
   );
 }

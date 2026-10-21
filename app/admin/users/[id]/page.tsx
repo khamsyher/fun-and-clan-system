@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { PageHeading, Section } from "@/components/app-shell";
 import { Pill, StatusBadge } from "@/components/badge";
 import { DocumentList } from "@/components/document-list";
-import { KycBadge, overallKyc } from "@/components/kyc-status";
+import { KycBadge, KycNotRequired, overallKyc } from "@/components/kyc-status";
 import { ProfileFacts } from "@/components/profile-facts";
 import { ResetPasswordButton } from "@/components/reset-password";
 import { query } from "@/lib/db";
@@ -53,7 +53,7 @@ export default async function AdminUserPage({ params }: PageProps<"/admin/users/
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <StatusBadge status={person.status} />
             {person.is_treasurer && <Pill tone="info">{t.treasurer.badge}</Pill>}
-            <KycBadge state={overallKyc(documents)} t={t} />
+            {isStaffRole(person.role) ? <KycNotRequired t={t} /> : <KycBadge state={overallKyc(documents)} t={t} />}
           </div>
         </PageHeading>
       </div>

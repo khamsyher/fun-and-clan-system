@@ -19,6 +19,7 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
   const range = parseRange(await searchParams);
   const r = await getPlatformReport(range.valid ? range : { from: range.to, to: range.to });
   const peak = Math.max(1, ...r.months.map((m) => Number(m.fees)));
+  const sv = r.savings;
 
   return (
     <>
@@ -109,9 +110,80 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
           </ul>
         )}
       </Section>
+
+      {/* Savings groups: members pay each other directly; the platform's share is the fee. */}
+      <Section title={rt.savingsTitle} aside={fmt(rt.savingsAside, { n: sv.totals.groups, fresh: sv.totals.newGroups })}>
+        <p className="-mt-2 mb-4 max-w-[65ch] text-sm text-ink-soft">{rt.savingsLede}</p>
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
+          <Cell label={rt.colRoundsDone} value={formatNumber(sv.totals.roundsDone)} />
+          <Cell label={rt.colPaidBetween} value={formatKip(sv.totals.paid)} />
+          <Cell label={rt.colFeesOwed} value={formatKip(sv.totals.feesOwed)} />
+          <Cell label={rt.colFeesReceived} value={formatKip(sv.totals.feesReceived)} strong />
+        </dl>
+
+        {sv.groups.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-line-strong bg-surface px-5 py-6 text-center text-sm text-ink-soft">{rt.noSavings}</p>
+        ) : (
+          <div className="relative mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
+            <table className="w-full min-w-[52rem] text-left text-sm">
+              <thead className="border-b border-line bg-brand-wash/60 text-xs text-ink-soft">
+                <tr>
+                  <th className="px-4 py-3 font-medium">{t.admin.colGroup}</th>
+                  <th className="px-4 py-3 font-medium">{t.savingsAdmin.colOrganizer}</th>
+                  <th className="px-4 py-3 font-medium">{t.admin.colStatus}</th>
+                  <th className="px-4 py-3 text-right font-medium">{t.savingsAdmin.colMembers}</th>
+                  <th className="px-4 py-3 text-right font-medium">{rt.colRoundsDone}</th>
+                  <th className="px-4 py-3 text-right font-medium">{rt.colPaidBetween}</th>
+                  <th className="px-4 py-3 text-right font-medium">{rt.colFeesOwed}</th>
+                  <th className="px-4 py-3 text-right font-medium">{rt.colFeesReceived}</th>
+                </tr>
+              </thead>
+              <tbody className="tabular divide-y divide-line">
+                {sv.groups.map((g) => (
+                  <tr key={g.code}>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-ink">
+                        {g.name}
+                        {g.is_new && <span className="ml-2 text-xs font-medium text-gold-deep">{rt.newInPeriod}</span>}
+                      </p>
+                      <p className="text-xs text-muted">
+                        <span className="font-semibold tracking-wide text-brand">{g.code}</span> · {formatKip(g.amount)} {t.savings.period[g.period]}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-ink-soft">{g.organizer}</td>
+                    <td className={`px-4 py-3 font-medium ${GROUP_TONE[g.status]}`}>{t.savings.groupStatus[g.status]}</td>
+                    <td className="px-4 py-3 text-right">{formatNumber(g.members)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {formatNumber(g.rounds_done)}
+                      {Number(g.rounds) > 0 && <span className="text-xs text-muted"> / {g.rounds}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(g.paid)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-warn">{formatKip(g.fees_owed)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-ok">{formatKip(g.fees_received)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="tabular border-t-2 border-line-strong font-semibold">
+                <tr>
+                  <td className="px-4 py-3">{rt.totals}</td>
+                  <td />
+                  <td />
+                  <td className="px-4 py-3 text-right">{formatNumber(sv.totals.members)}</td>
+                  <td className="px-4 py-3 text-right">{formatNumber(sv.totals.roundsDone)}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(sv.totals.paid)}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(sv.totals.feesOwed)}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(sv.totals.feesReceived)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Section>
     </>
   );
 }
+
+const GROUP_TONE = { forming: "text-brand", active: "text-ok", completed: "text-muted", cancelled: "text-bad" } as const;
 
 function Cell({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (

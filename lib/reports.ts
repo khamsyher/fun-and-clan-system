@@ -138,7 +138,7 @@ export type PlatformReport = Awaited<ReturnType<typeof getPlatformReport>>;
 
 /** Totals only, per clan and per month — the super admin never sees individual members' payments. */
 export async function getPlatformReport({ from, to }: Range) {
-  const [clans, months] = await Promise.all([
+  const [clans, months, savings] = await Promise.all([
     query<{
       name: string;
       code: string;
@@ -179,6 +179,40 @@ export async function getPlatformReport({ from, to }: Range) {
         GROUP BY 1 ORDER BY 1`,
       [1, from, to],
     ),
+    // Savings groups: every group that existed by the end of the period, with what happened in it
+    // during the period. Totals per group only — no member's individual payments.
+    query<{
+      name: string;
+      code: string;
+      organizer: string;
+      status: "forming" | "active" | "completed" | "cancelled";
+      period: "weekly" | "monthly";
+      amount: string;
+      is_new: boolean;
+      members: string;
+      rounds: string;
+      rounds_done: string;
+      paid: string;
+      fees_owed: string;
+      fees_received: string;
+    }>(
+      `SELECT g.name, g.invite_code AS code, o.full_name AS organizer, g.status::text AS status, g.period::text AS period, g.amount,
+              (g.created_at >= ${START}) AS is_new,
+              (SELECT COUNT(*) FROM savings_members m WHERE m.group_id = g.id AND m.status = 'approved') AS members,
+              (SELECT COUNT(*) FROM savings_rounds r WHERE r.group_id = g.id) AS rounds,
+              (SELECT COUNT(*) FROM savings_rounds r WHERE r.group_id = g.id AND r.status = 'done'
+                  AND r.done_at >= ${START} AND r.done_at < ${END}) AS rounds_done,
+              (SELECT COALESCE(SUM(p.amount), 0) FROM savings_payments p JOIN savings_rounds r ON r.id = p.round_id
+                WHERE r.group_id = g.id AND p.status = 'confirmed' AND p.reviewed_at >= ${START} AND p.reviewed_at < ${END}) AS paid,
+              (SELECT COALESCE(SUM(f.fee_amount), 0) FROM savings_fees f JOIN savings_rounds r ON r.id = f.round_id
+                WHERE r.group_id = g.id AND f.status = 'owed' AND f.created_at >= ${START} AND f.created_at < ${END}) AS fees_owed,
+              (SELECT COALESCE(SUM(f.fee_amount), 0) FROM savings_fees f JOIN savings_rounds r ON r.id = f.round_id
+                WHERE r.group_id = g.id AND f.status = 'received' AND f.created_at >= ${START} AND f.created_at < ${END}) AS fees_received
+         FROM savings_groups g JOIN users o ON o.id = g.organizer_id
+        WHERE $1::int = 1 AND g.created_at < ${END}
+        ORDER BY g.created_at`,
+      [1, from, to],
+    ),
   ]);
 
   const n = (rows: Record<string, string | number | boolean>[], k: string) => rows.reduce((s, r) => s + Number(r[k]), 0);
@@ -187,6 +221,18 @@ export async function getPlatformReport({ from, to }: Range) {
     to,
     clans,
     months,
+    savings: {
+      groups: savings,
+      totals: {
+        groups: savings.length,
+        newGroups: savings.filter((g) => g.is_new).length,
+        members: n(savings, "members"),
+        roundsDone: n(savings, "rounds_done"),
+        paid: n(savings, "paid"),
+        feesOwed: n(savings, "fees_owed"),
+        feesReceived: n(savings, "fees_received"),
+      },
+    },
     totals: {
       members: n(clans, "members"),
       events: n(clans, "events"),

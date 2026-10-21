@@ -346,6 +346,46 @@ export async function platformPdf(r: PlatformReport, t: Dictionary, locale: Loca
       r.months.map((m) => [m.month, m.events, p.kip(Number(m.fees)), p.kip(Number(m.received))]),
     );
 
+  p.section(rt.savingsTitle);
+  if (r.savings.groups.length === 0) p.note(rt.noSavings);
+  else {
+    const st = r.savings.totals;
+    p.table(
+      [
+        { label: t.admin.colGroup, width: 24 },
+        { label: t.savingsAdmin.colOrganizer, width: 16 },
+        { label: t.admin.colStatus, width: 11 },
+        { label: t.savingsAdmin.colMembers, width: 8, align: "right" },
+        { label: rt.colRoundsDone, width: 9, align: "right" },
+        { label: rt.colPaidBetween, width: 12, align: "right" },
+        { label: rt.colFeesOwed, width: 10, align: "right" },
+        { label: rt.colFeesReceived, width: 10, align: "right" },
+      ],
+      [
+        ...r.savings.groups.map((g) => [
+          `${g.name} (${g.code})`,
+          g.organizer,
+          t.savings.groupStatus[g.status],
+          g.members,
+          g.rounds_done,
+          p.kip(Number(g.paid)),
+          p.kip(Number(g.fees_owed)),
+          p.kip(Number(g.fees_received)),
+        ]),
+        [
+          { text: rt.totals, bold: true },
+          "",
+          "",
+          { text: String(st.members), bold: true },
+          { text: String(st.roundsDone), bold: true },
+          { text: p.kip(st.paid), bold: true },
+          { text: p.kip(st.feesOwed), bold: true },
+          { text: p.kip(st.feesReceived), bold: true },
+        ],
+      ],
+    );
+  }
+
   p.footer(`${rt.adminReportTitle} · ${period}`);
   return p.toBuffer();
 }

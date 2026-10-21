@@ -125,5 +125,31 @@ export async function platformWorkbook(r: PlatformReport, t: Dictionary, locale:
   header(f, [rt.colMonth, rt.colEvents, rt.colFeesTotal, rt.colFeesReceived], [12, 10, 16, 16]);
   for (const m of r.months) money(f.addRow([m.month, Number(m.events), Number(m.fees), Number(m.received)]), 3, 4);
 
+  const s = wb.addWorksheet(rt.sheetSavings);
+  titleBlock(s, rt.savingsTitle, period);
+  header(
+    s,
+    [t.admin.colGroup, t.savingsAdmin.colOrganizer, t.admin.colStatus, t.savingsAdmin.colAmount, t.savingsAdmin.colMembers, rt.colRoundsDone, rt.colPaidBetween, rt.colFeesOwed, rt.colFeesReceived],
+    [30, 20, 14, 16, 10, 12, 18, 16, 16],
+  );
+  for (const g of r.savings.groups) {
+    const row = s.addRow([
+      `${g.name} (${g.code})`,
+      g.organizer,
+      t.savings.groupStatus[g.status],
+      Number(g.amount),
+      Number(g.members),
+      Number(g.rounds_done),
+      Number(g.paid),
+      Number(g.fees_owed),
+      Number(g.fees_received),
+    ]);
+    money(row, 4, 7, 8, 9);
+  }
+  const st = r.savings.totals;
+  const sTotal = s.addRow([rt.totals, "", "", "", st.members, st.roundsDone, st.paid, st.feesOwed, st.feesReceived]);
+  sTotal.font = { bold: true };
+  money(sTotal, 7, 8, 9);
+
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
