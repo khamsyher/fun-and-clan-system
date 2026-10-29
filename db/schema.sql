@@ -902,3 +902,46 @@ CREATE TABLE IF NOT EXISTS support_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS support_messages_thread_idx ON support_messages (thread_id, id);
+
+-- ===========================================================================
+-- The clan leader's household pays funeral collections too (Mode B), like every member's.
+-- New events bill the leader from app/actions/events.ts; this gives leaders a bill on events
+-- that were already collecting before that change. Re-runnable: one bill per event and person.
+-- ===========================================================================
+INSERT INTO event_bills (clan_id, event_id, member_id, amount, carried_in)
+SELECT e.clan_id, e.id, u.id, e.rate_amount,
+       COALESCE((SELECT SUM(b.amount) FROM event_bills b WHERE b.member_id = u.id AND b.status = 'carried'), 0)
+  FROM death_events e
+  JOIN users u ON u.clan_id = e.clan_id AND u.role = 'clan_admin' AND u.status = 'active' AND u.deceased_at IS NULL
+ WHERE e.fund_mode = 'B' AND e.status = 'collecting'
+ON CONFLICT (event_id, member_id) DO NOTHING;
+
+-- ===========================================================================
+-- Clan rules: the leader writes the clan's rules as text, platform staff approve them,
+-- and the latest approved version is what members read and agree to. A new version waits
+-- for approval while members keep seeing the current one. Additive and re-runnable.
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS clan_policies (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clan_id      UUID NOT NULL REFERENCES clans(id) ON DELETE CASCADE,
+  body         VARCHAR(5000) NOT NULL CHECK (length(btrim(body)) > 0),
+  status       join_status NOT NULL DEFAULT 'pending',
+  note         VARCHAR(300),                                   -- staff's reason when declined
+  submitted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  decided_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  decided_at   TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One version waiting per clan.
+CREATE UNIQUE INDEX IF NOT EXISTS clan_policies_one_pending ON clan_policies (clan_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS clan_policies_clan_idx ON clan_policies (clan_id, status, decided_at DESC);
+CREATE INDEX IF NOT EXISTS clan_policies_queue_idx ON clan_policies (status, created_at);
+
+-- A member agreeing to one approved version. A new version needs agreeing to again.
+CREATE TABLE IF NOT EXISTS clan_policy_agreements (
+  policy_id UUID NOT NULL REFERENCES clan_policies(id) ON DELETE CASCADE,
+  user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  agreed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (policy_id, user_id)
+);

@@ -90,13 +90,14 @@ export async function reportDeath(_state: FormState, formData: FormData): Promis
       }
 
       if (clan.fund_mode === "B") {
-        // One bill per living, active member account, showing any debt carried from earlier events.
+        // One bill per living, active account in the clan, showing any debt carried from earlier
+        // events. The clan leader's household pays too, like every member's.
         await db.query(
           `INSERT INTO event_bills (clan_id, event_id, member_id, amount, carried_in)
            SELECT $1, $2, u.id, $3,
                   COALESCE((SELECT SUM(b.amount) FROM event_bills b WHERE b.member_id = u.id AND b.status = 'carried'), 0)
              FROM users u
-            WHERE u.clan_id = $1 AND u.role = 'member' AND u.status = 'active' AND u.deceased_at IS NULL`,
+            WHERE u.clan_id = $1 AND u.role IN ('member', 'clan_admin') AND u.status = 'active' AND u.deceased_at IS NULL`,
           [leader.clanId, id, clan.contribution_amount],
         );
       }

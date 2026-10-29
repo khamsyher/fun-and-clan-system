@@ -1,14 +1,4 @@
 // Live support chat over WebSocket, at /ws/support.
-//
-// Runs inside the custom server (server.ts), next to Next.js but outside it: Next's route
-// handlers can't hold a socket open. So this file can't use lib/session or lib/db (they are
-// server-only and need Next's request context); it verifies the same signed session cookie
-// itself, with the same secret, and keeps its own small database pool.
-//
-// Who talks to whom: every person (not platform staff) has one conversation with the platform
-// team. Staff (super admin and support) see every conversation. A message is saved first and
-// only then sent live to the conversation's owner and to every connected staff member, so what
-// people see is always what the database has.
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { jwtVerify } from "jose";

@@ -16,6 +16,7 @@ import { feeFor } from "@/lib/funds";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { BillControls, ConfirmEventAction, MarkPaidForm, PayoutRequestForm } from "./controls";
+import { SlipUpload } from "@/app/member/payments/slip-form";
 
 export async function generateMetadata({ params }: PageProps<"/clan/events/[id]">): Promise<Metadata> {
   const t = await getT();
@@ -27,6 +28,7 @@ export async function generateMetadata({ params }: PageProps<"/clan/events/[id]"
 
 type BillRow = {
   id: string;
+  member_id: string;
   full_name: string;
   phone: string;
   amount: string;
@@ -37,9 +39,9 @@ type BillRow = {
   via_slip: boolean;
 };
 
-export default async function EventPage({ params }: PageProps<"/clan/events/[id]">) {
+export default async function EventPage({ params, searchParams }: PageProps<"/clan/events/[id]">) {
   const leader = await requireRole("clan_admin");
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const [t, locale] = await Promise.all([getT(), getLocale()]);
   const ev = t.events;
 
@@ -48,7 +50,7 @@ export default async function EventPage({ params }: PageProps<"/clan/events/[id]
 
   const [bills, payouts, funds, hasMoney, treasurers] = await Promise.all([
     query<BillRow>(
-      `SELECT b.id, u.full_name, u.phone, b.amount, b.carried_in, b.status, b.paid_method,
+      `SELECT b.id, b.member_id, u.full_name, u.phone, b.amount, b.carried_in, b.status, b.paid_method,
               EXISTS (SELECT 1 FROM payment_slips s WHERE s.bill_id = b.id AND s.status = 'pending') AS pending_slip,
               EXISTS (SELECT 1 FROM payment_slips s WHERE s.bill_id = b.id AND s.status = 'approved') AS via_slip
          FROM event_bills b JOIN users u ON u.id = b.member_id
@@ -66,6 +68,7 @@ export default async function EventPage({ params }: PageProps<"/clan/events/[id]
   ]);
 
   const isB = event.fund_mode === "B";
+  const myBill = bills.find((b) => b.member_id === leader.id) ?? null;
   const unpaid = bills.filter((b) => b.status === "unpaid").length;
   const live = payouts.find((p) => p.status !== "rejected");
   const gross = Number(event.gross_collected ?? 0);
@@ -80,6 +83,11 @@ export default async function EventPage({ params }: PageProps<"/clan/events/[id]
       <Link href="/clan/events" className="text-sm font-medium text-brand hover:text-brand-bright">
         ← {ev.back}
       </Link>
+      {sp.sent === "1" && (
+        <div className="mt-4">
+          <Notice tone="success">{t.slips.uploaded}</Notice>
+        </div>
+      )}
 
       <div className="mt-3 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -131,6 +139,31 @@ export default async function EventPage({ params }: PageProps<"/clan/events/[id]
         </div>
       </div>
 
+      {/* The leader's own household is billed like every member's, and pays the same way. */}
+      {myBill && (
+        <div className="mt-4 max-w-xl rounded-xl p-5 text-white shadow-soft panel-brand sm:p-6">
+          <h2 className="text-sm text-white/75">{ev.yourBill}</h2>
+          <p className="tabular mt-1 font-display text-3xl">{formatKip(myBill.amount)}</p>
+          <div className="mt-2 [&_span]:bg-white/15 [&_span]:text-white">
+            <BillBadge status={myBill.status} />
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-white/80">
+            {myBill.pending_slip
+              ? t.contributions.pendingSlip
+              : myBill.status === "paid" || myBill.status === "settled"
+                ? ev.yourBillPaid
+                : myBill.status === "carried"
+                  ? ev.yourBillCarried
+                  : fmt(ev.yourBillUnpaidLeader, { amount: formatKip(Number(myBill.amount) + Number(myBill.carried_in)) })}
+          </p>
+          {!myBill.pending_slip && (myBill.status === "carried" || (myBill.status === "unpaid" && event.status === "collecting")) && (
+            <div className="mt-4">
+              <SlipUpload target={`b:${myBill.id}`} amount={Number(myBill.amount)} debt={Number(myBill.carried_in)} onBrand />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ---- Collection (Mode B) ---- */}
       {isB && event.status !== "cancelled" && (
         <Section title={ev.bills} aside={fmt(ev.paidCount, { paid: Number(event.bills_paid), total: Number(event.bills_total) })}>
@@ -149,7 +182,11 @@ export default async function EventPage({ params }: PageProps<"/clan/events/[id]
                 {bills.map((b) => (
                   <tr key={b.id}>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-ink">{b.full_name}</p>
+                      {/* The leader's own household is billed too; they record their payment here like anyone's. */}
+                      <p className="font-medium text-ink">
+                        {b.full_name}
+                        {b.member_id === leader.id && <span className="ml-1.5 font-normal text-muted">({t.savings.you})</span>}
+                      </p>
                       <p className="tabular text-xs text-muted">{b.phone}</p>
                     </td>
                     <td className="tabular px-4 py-3 text-right">{formatKip(b.amount)}</td>

@@ -13,19 +13,21 @@ import { renderNotification } from "@/lib/notification-text";
 import { listNotifications, unreadCount } from "@/lib/notify";
 import { countPendingKyc } from "@/lib/kyc";
 import { countPendingLeaderRequests } from "@/lib/leader-requests";
+import { countPendingPolicies } from "@/lib/policies";
 import { unreadForUser, unreadThreadsForStaff } from "@/lib/support";
 import { AreaNav } from "./area-nav";
 import { MobileNav, SideNav } from "./side-nav";
 import { areasFor } from "@/lib/navigation";
 export async function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
   const staff = isStaffRole(user.role);
-  const [t, locale, recent, unread, kycWaiting, leaderRequests, supportUnread] = await Promise.all([
+  const [t, locale, recent, unread, kycWaiting, leaderRequests, policiesWaiting, supportUnread] = await Promise.all([
     getT(),
     getLocale(),
     listNotifications(user.id, 8),
     unreadCount(user.id),
     isStaffRole(user.role) ? countPendingKyc() : 0,
     isStaffRole(user.role) ? countPendingLeaderRequests() : 0,
+    isStaffRole(user.role) ? countPendingPolicies() : 0,
     // Staff: conversations waiting on them. Everyone else: replies they haven't read.
     staff ? unreadThreadsForStaff() : unreadForUser(user.id),
   ]);
@@ -35,7 +37,7 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
     .map((p) => p[0]?.toUpperCase())
     .join("");
 
-  const areas = areasFor(user, t, { kycWaiting, leaderRequests, supportUnread });
+  const areas = areasFor(user, t, { kycWaiting, leaderRequests: leaderRequests + policiesWaiting, supportUnread });
 
   const controls = (
           <div className="flex items-center gap-2 sm:gap-3">

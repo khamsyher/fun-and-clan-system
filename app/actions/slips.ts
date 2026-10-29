@@ -18,10 +18,11 @@ const refresh = () => {
 
 /**
  * A member uploads proof of a transfer for one of their own bills (unpaid or carried as debt)
- * or one of their own contribution dues. It waits for the leader's review.
+ * or one of their own contribution dues. It waits for the leader's review. The clan leader's
+ * household is billed too, so the leader pays the same way and reviews the slip in the list.
  */
 export async function uploadSlip(_state: FormState, formData: FormData): Promise<FormState> {
-  const me = await requireRole("member");
+  const me = await requireRole("member", "clan_admin");
   const tt = await getT();
   const t = tt.slips;
 
@@ -43,13 +44,14 @@ export async function uploadSlip(_state: FormState, formData: FormData): Promise
   }
   if (Object.keys(errors).length || !upload.ok) return { errors, values };
 
+  let eventId: string | null = null;
   try {
     const ok = await transaction(async (db) => {
       // The target must be the member's own and still payable.
       const payable =
         kind === "b"
-          ? await db.query(
-              `SELECT 1 FROM event_bills b JOIN death_events e ON e.id = b.event_id
+          ? await db.query<{ event_id: string }>(
+              `SELECT b.event_id FROM event_bills b JOIN death_events e ON e.id = b.event_id
                 WHERE b.id = $1 AND b.member_id = $2 AND b.clan_id = $3
                   AND (b.status = 'carried' OR (b.status = 'unpaid' AND e.status = 'collecting'))`,
               [targetId, me.id, me.clanId],
@@ -60,6 +62,7 @@ export async function uploadSlip(_state: FormState, formData: FormData): Promise
               me.clanId,
             ]);
       if (!payable.rowCount) return false;
+      if (kind === "b") eventId = (payable.rows[0] as { event_id: string }).event_id;
 
       const file = await db.query<{ id: string }>(
         `INSERT INTO files (clan_id, uploaded_by, purpose, file_name, content_type, size_bytes, data)
@@ -76,7 +79,8 @@ export async function uploadSlip(_state: FormState, formData: FormData): Promise
       );
       await audit(db, me.clanId, me.id, "slip.uploaded", slip.rows[0].id, { amount });
       const leader = await clanLeaderId(db, me.clanId!);
-      if (leader) await notify(db, leader, "slip_uploaded", { name: me.fullName, amount: formatKip(amount!) }, "/clan/slips");
+      // The leader paying their own bill doesn't need telling about it.
+      if (leader && leader !== me.id) await notify(db, leader, "slip_uploaded", { name: me.fullName, amount: formatKip(amount!) }, "/clan/slips");
       return true;
     });
     if (!ok) return { message: t.errTarget, values };
@@ -88,6 +92,7 @@ export async function uploadSlip(_state: FormState, formData: FormData): Promise
 
   refresh();
   // The item switches to "slip waiting", so confirm at the top of the page instead.
+  if (me.role === "clan_admin") redirect(eventId ? `/clan/events/${eventId}?sent=1` : "/clan/slips");
   redirect("/member/payments?sent=1");
 }
 

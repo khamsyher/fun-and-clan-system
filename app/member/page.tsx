@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeading, Section } from "@/components/app-shell";
-import { StatusBadge } from "@/components/badge";
+import { Pill, StatusBadge } from "@/components/badge";
+import { SubmitButton } from "@/components/ui";
+import { agreePolicy } from "@/app/actions/policies";
+import { currentPolicy, hasAgreed } from "@/lib/policies";
 import { ArrowRightIcon, UsersIcon } from "@/components/icons";
 import { requireRole } from "@/lib/dal";
 import { query, queryOne } from "@/lib/db";
@@ -43,6 +46,8 @@ export default async function MemberPage() {
     memberDebt(me.clanId!, me.id),
     listEvents(me.clanId!),
   ]);
+  const rules = await currentPolicy(me.clanId!);
+  const agreedAt = rules ? await hasAgreed(rules.id, me.id) : null;
   const owed = debt.open + debt.carried;
   const open = events.filter((e) => e.status === "collecting");
 
@@ -100,6 +105,33 @@ export default async function MemberPage() {
           )}
         </div>
       </div>
+
+      {rules && (
+        <Section title={t.policy.title}>
+          <div className={`rounded-xl border bg-surface p-5 sm:p-6 ${agreedAt ? "border-line" : "border-brand/40 shadow-soft"}`}>
+            <p className="text-sm text-ink-soft">{agreedAt ? t.policy.memberLede : t.policy.pleaseAgree}</p>
+            {/* Open until they agree; afterwards it folds away but stays one tap from view. */}
+            <details open={!agreedAt} className="mt-3">
+              <summary className="cursor-pointer text-sm font-semibold text-brand hover:text-brand-bright">
+                {fmt(t.policy.approvedOn, { date: formatDate(rules.decided_at, locale) })}
+              </summary>
+              <p className="mt-3 max-h-[28rem] overflow-y-auto rounded-lg bg-paper/60 p-4 text-sm leading-relaxed whitespace-pre-line break-words text-ink">
+                {rules.body}
+              </p>
+            </details>
+            <div className="mt-4">
+              {agreedAt ? (
+                <Pill tone="ok">{fmt(t.policy.youAgreed, { date: formatDate(agreedAt, locale) })}</Pill>
+              ) : (
+                <form action={agreePolicy}>
+                  <input type="hidden" name="policyId" value={rules.id} />
+                  <SubmitButton pendingLabel={t.policy.sending}>{t.policy.agree}</SubmitButton>
+                </form>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
 
       <Section title={m.openCollections}>
         {open.length === 0 ? (

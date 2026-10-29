@@ -49,7 +49,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
         owns: [],
         sections: [
           { href: "/admin", label: t.nav.overview },
-          // The badge counts people waiting to hear whether they may set up a clan.
+          // The badge counts people waiting to hear whether they may set up a clan, and clan rules waiting for approval.
           { href: "/admin/clans", label: t.clansAdmin.title, badge: badges.leaderRequests },
           { href: "/admin/fund", label: t.fundAdmin.title },
           { href: "/admin/savings", label: t.savingsAdmin.title },
@@ -81,6 +81,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
           ...(user.clanFundMode === "A" ? [{ href: "/clan/contributions", label: t.nav.contributions }] : []),
           { href: "/clan/fund", label: t.nav.fund },
           { href: "/clan/reports", label: t.nav.reports },
+          { href: "/clan/rules", label: t.nav.rules },
           { href: "/clan/settings", label: t.nav.settings },
         ],
       },

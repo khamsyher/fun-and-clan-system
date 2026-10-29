@@ -50,7 +50,11 @@ export type NotificationType =
   | "savings_swap_requested"
   | "savings_swap_requested_note"
   | "savings_swap_declined"
-  | "savings_swap_done";
+  | "savings_swap_done"
+  | "policy_submitted"
+  | "policy_approved"
+  | "policy_rejected"
+  | "policy_new";
 
 type Params = Record<string, string | number>;
 type Db = Pick<PoolClient, "query">;

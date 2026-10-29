@@ -9,8 +9,11 @@ import { fmt } from "@/lib/i18n/config";
 
 const kip = (n: number) => `${new Intl.NumberFormat("en-US").format(n)} ₭`;
 
-/** "Upload slip" button that opens the upload form for one payable item. */
-export function SlipUpload({ target, amount, debt }: { target: string; amount: number; debt: number }) {
+/**
+ * "Upload slip" button that opens the upload form for one payable item. `onBrand` is for the
+ * dark "Your household's bill" card: a light button, and a solid form so it stays readable.
+ */
+export function SlipUpload({ target, amount, debt, onBrand = false }: { target: string; amount: number; debt: number; onBrand?: boolean }) {
   const tt = useT();
   const t = tt.slips;
   const [open, setOpen] = useState(false);
@@ -24,16 +27,24 @@ export function SlipUpload({ target, amount, debt }: { target: string; amount: n
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-soft hover:bg-brand-2"
+        className={
+          onBrand
+            ? "inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-brand hover:bg-brand-wash"
+            : "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-soft hover:bg-brand-2"
+        }
       >
         <UploadIcon width={16} height={16} />
-        {tt.payments.pay}
+        {onBrand ? tt.member.payWithSlip : tt.payments.pay}
       </button>
     );
   }
 
   return (
-    <form action={action} className="mt-4 w-full space-y-4 rounded-lg border border-line bg-paper/60 p-4" noValidate>
+    <form
+      action={action}
+      className={`mt-4 w-full space-y-4 rounded-lg border border-line p-4 ${onBrand ? "bg-surface text-ink" : "bg-paper/60"}`}
+      noValidate
+    >
       <input type="hidden" name="target" value={target} />
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       {debt > 0 && (
