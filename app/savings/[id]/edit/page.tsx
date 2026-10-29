@@ -37,6 +37,8 @@ export default async function EditSavingsGroupPage({ params }: PageProps<"/savin
             amount: group.amount,
             period: group.period,
             startDate: group.start_date,
+            rules: group.rules ?? "",
+            rulesFileId: group.rules_file_id,
           }}
         />
       </div>

@@ -8,10 +8,13 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.*.*"],
   experimental: {
     serverActions: {
-      // Each file is up to 5 MB (lib/upload-limits.ts) and a donation request can carry two
-      // (photo + QR), so allow both plus the form fields and multipart overhead.
-      bodySizeLimit: "12mb",
+      // Help-request videos are uploaded one per request, up to 30 MB each (lib/upload-limits.ts);
+      // other forms carry at most a few 5 MB images. Leave room for the multipart overhead.
+      bodySizeLimit: "32mb",
     },
+    // proxy.ts runs on every page, and Next buffers request bodies through it — only 10 MB by
+    // default, which would silently cut larger uploads short. Keep it in step with the limit above.
+    proxyClientMaxBodySize: "32mb",
   },
   // pdfkit reads its own font metrics from disk and exceljs is large; load both with plain Node require.
   serverExternalPackages: ["pdfkit", "exceljs"],

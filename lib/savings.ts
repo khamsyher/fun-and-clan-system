@@ -15,6 +15,9 @@ export type GroupRow = {
   organizer_name: string;
   name: string;
   description: string | null;
+  rules: string | null;
+  rules_file_id: string | null;
+  rules_updated_at: Date | null;
   amount: string;
   period: SavingsPeriod;
   start_date: string; // YYYY-MM-DD
@@ -29,7 +32,7 @@ export type GroupRow = {
 
 // Savings groups cross clans: access is decided by membership in the group, never by clan.
 const GROUP_SELECT = `
-  SELECT g.id, g.organizer_id, o.full_name AS organizer_name, g.name, g.description, g.amount, g.period,
+  SELECT g.id, g.organizer_id, o.full_name AS organizer_name, g.name, g.description, g.rules, g.rules_file_id, g.rules_updated_at, g.amount, g.period,
          to_char(g.start_date, 'YYYY-MM-DD') AS start_date, g.invite_code, g.fee_percent, g.status,
          g.created_at, g.started_at, g.completed_at,
          (SELECT COUNT(*) FROM savings_members m WHERE m.group_id = g.id AND m.status = 'approved') AS members

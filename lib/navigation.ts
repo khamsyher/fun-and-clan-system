@@ -75,6 +75,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
         owns: [],
         sections: [
           { href: "/clan", label: t.nav.overview },
+          { href: "/clan/members", label: t.nav.members },
           { href: "/clan/events", label: t.nav.events },
           { href: "/clan/slips", label: t.nav.slips },
           // Mode A clans collect on a schedule; Mode B clans have nothing to show here.

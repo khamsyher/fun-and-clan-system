@@ -5,12 +5,14 @@ import { redirect } from "next/navigation";
 import { query, queryOne, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { canAskForHelp } from "@/lib/access";
-import { readUpload, type UploadCheck } from "@/lib/files";
+import { readMedia, readUpload, type UploadCheck } from "@/lib/files";
+import { MAX_REQUEST_IMAGES, MAX_REQUEST_VIDEOS } from "@/lib/upload-limits";
 import { isPastDate, parseKip, UUID_RE } from "@/lib/funds";
 import { clanMemberIds, direct, notify, notifyMany } from "@/lib/notify";
 import { formatKip } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { DONOR_ROLES, type FormState } from "@/lib/definitions";
+import { fmt } from "@/lib/i18n/config";
 import type { PoolClient } from "pg";
 
 const refresh = () => revalidatePath("/donations", "layout");
@@ -57,9 +59,7 @@ async function readRequestForm(formData: FormData, t: Dict, keepsPayment = false
   if (targetRaw && !target) errors.target = [t.errTarget];
   if (deadline && !isFutureDate(deadline)) errors.deadline = [t.errDeadline];
 
-  const photo = await readUpload(formData.get("photo"));
   const qr = await readUpload(formData.get("qr"));
-  if (!photo.ok && photo.reason !== "missing") errors.photo = [t.errFile];
   if (!qr.ok && qr.reason !== "missing") errors.qr = [t.errFile];
   // People need somewhere to send the money: either an account or a QR photo.
   if (!(accountName && accountNumber) && !qr.ok && !keepsPayment) errors.accountNumber = [t.errPayment];
@@ -69,7 +69,6 @@ async function readRequestForm(formData: FormData, t: Dict, keepsPayment = false
     errors,
     values,
     fields: { title, story, target, deadline: deadline || null, bankName, accountName, accountNumber },
-    photo,
     qr,
   };
 }
@@ -83,18 +82,17 @@ export async function createRequest(_state: FormState, formData: FormData): Prom
   if (!canAskForHelp(me)) return { message: tt.kyc.needForRequest };
 
   const form = await readRequestForm(formData, t);
-  const { values, photo, qr } = form;
+  const { values, qr } = form;
   const { title, story, target, deadline, bankName, accountName, accountNumber } = form.fields;
   if (!form.ok) return { errors: form.errors, values };
 
   const id = await transaction(async (db) => {
-    const photoId = await storeFile(db, me.clanId, me.id, "donation_photo", photo);
     const qrId = await storeFile(db, me.clanId, me.id, "donation_qr", qr);
     const r = await db.query<{ id: string }>(
       `INSERT INTO donation_requests
-         (clan_id, created_by, title, story, target_amount, deadline, bank_name, account_name, account_number, photo_file_id, qr_file_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [me.clanId, me.id, title, story, target, deadline, bankName, accountName, accountNumber, photoId, qrId],
+         (clan_id, created_by, title, story, target_amount, deadline, bank_name, account_name, account_number, qr_file_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+      [me.clanId, me.id, title, story, target, deadline, bankName, accountName, accountNumber, qrId],
     );
     await db.query(`INSERT INTO audit_logs (clan_id, actor_id, action, target_id) VALUES ($1, $2, 'donation.requested', $3)`, [
       me.clanId,
@@ -110,12 +108,13 @@ export async function createRequest(_state: FormState, formData: FormData): Prom
   });
 
   refresh();
-  redirect(`/donations/${id}`);
+  // The browser now uploads the photos and videos one by one (addRequestMedia), then opens the request.
+  return { success: "created", kind: id };
 }
 
 /**
  * The person who asked edits their own request later: details, payment information,
- * and the photo / QR (uploading a new one replaces it, or it can be removed).
+ * the QR (uploading a new one replaces it, or it can be removed), and gallery items marked for removal.
  * Donations already received are untouched.
  */
 export async function updateRequest(_state: FormState, formData: FormData): Promise<FormState> {
@@ -131,27 +130,34 @@ export async function updateRequest(_state: FormState, formData: FormData): Prom
   );
   if (!current) return { message: t.notYours };
 
-  const removePhoto = formData.get("removePhoto") === "on";
   const removeQr = formData.get("removeQr") === "on";
   // The existing QR still counts as a way to pay, unless it is being removed.
   const keepsQr = Boolean(current.qr_file_id) && !removeQr;
   const form = await readRequestForm(formData, t, keepsQr);
-  const { values, photo, qr } = form;
+  const { values, qr } = form;
   const { title, story, target, deadline, bankName, accountName, accountNumber } = form.fields;
   if (!form.ok) return { errors: form.errors, values };
+  const removeMedia = formData.getAll("removeMedia").map(String).filter((x) => UUID_RE.test(x));
 
   await transaction(async (db) => {
-    const photoId = await storeFile(db, me.clanId, me.id, "donation_photo", photo);
     const qrId = await storeFile(db, me.clanId, me.id, "donation_qr", qr);
     await db.query(
       `UPDATE donation_requests
           SET title = $3, story = $4, target_amount = $5, deadline = $6, bank_name = $7, account_name = $8, account_number = $9,
-              photo_file_id = CASE WHEN $10::uuid IS NOT NULL THEN $10::uuid WHEN $12 THEN NULL ELSE photo_file_id END,
-              qr_file_id   = CASE WHEN $11::uuid IS NOT NULL THEN $11::uuid WHEN $13 THEN NULL ELSE qr_file_id END,
+              qr_file_id   = CASE WHEN $10::uuid IS NOT NULL THEN $10::uuid WHEN $11 THEN NULL ELSE qr_file_id END,
               updated_at = now()
         WHERE id = $1 AND created_by = $2`,
-      [requestId, me.id, title, story, target, deadline, bankName, accountName, accountNumber, photoId, qrId, removePhoto, removeQr],
+      [requestId, me.id, title, story, target, deadline, bankName, accountName, accountNumber, qrId, removeQr],
     );
+    if (removeMedia.length) {
+      // Only this request's own items; the files go with them (nothing else points at them).
+      const gone = await db.query<{ file_id: string }>(
+        `DELETE FROM donation_media WHERE request_id = $1 AND id = ANY($2::uuid[]) RETURNING file_id`,
+        [requestId, removeMedia],
+      );
+      await syncCover(db, requestId);
+      if (gone.rowCount) await db.query(`DELETE FROM files WHERE id = ANY($1::uuid[])`, [gone.rows.map((r) => r.file_id)]);
+    }
     await db.query(`INSERT INTO audit_logs (clan_id, actor_id, action, target_id) VALUES ($1, $2, 'donation.updated', $3)`, [
       me.clanId,
       me.id,
@@ -160,7 +166,74 @@ export async function updateRequest(_state: FormState, formData: FormData): Prom
   });
 
   refresh();
-  redirect(`/donations/${requestId}?saved=1`);
+  // The browser uploads any new photos and videos (addRequestMedia), then opens the request.
+  return { success: "saved", kind: requestId };
+}
+
+/** The cover — shown in the list and on shared links — is always the gallery's first photo. */
+async function syncCover(db: PoolClient, requestId: string) {
+  await db.query(
+    `UPDATE donation_requests
+        SET photo_file_id = (SELECT file_id FROM donation_media WHERE request_id = $1 AND kind = 'image' ORDER BY position, created_at LIMIT 1)
+      WHERE id = $1`,
+    [requestId],
+  );
+}
+
+/**
+ * Adds one photo or video to the asker's own request — one file per call, so a large video
+ * neither blocks the others nor loses the request if it fails. Checks ownership, the
+ * gallery limits (10 photos, 3 videos) and the file's real content.
+ */
+export async function addRequestMedia(_state: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireRole(...DONOR_ROLES);
+  const t = (await getT()).donations;
+  const requestId = String(formData.get("requestId") ?? "");
+  if (!UUID_RE.test(requestId)) return { message: t.errState };
+
+  const media = await readMedia(formData.get("file"));
+  if (!media.ok) {
+    if (media.reason === "size") return { message: media.kind === "image" ? t.errImageSize : t.errVideoSize };
+    return { message: t.errMediaType };
+  }
+
+  return transaction(async (db): Promise<FormState> => {
+    const request = (
+      await db.query(`SELECT 1 FROM donation_requests WHERE id = $1 AND created_by = $2 AND status <> 'cancelled' FOR UPDATE`, [requestId, me.id])
+    ).rows[0];
+    if (!request) return { message: t.notYours };
+
+    const have = (
+      await db.query<{ images: string; videos: string; next: number }>(
+        `SELECT COUNT(*) FILTER (WHERE kind = 'image') AS images, COUNT(*) FILTER (WHERE kind = 'video') AS videos,
+                COALESCE(MAX(position), -1) + 1 AS next
+           FROM donation_media WHERE request_id = $1`,
+        [requestId],
+      )
+    ).rows[0];
+    if (media.kind === "image" && Number(have.images) >= MAX_REQUEST_IMAGES) return { message: fmt(t.errTooManyImages, { n: MAX_REQUEST_IMAGES }) };
+    if (media.kind === "video" && Number(have.videos) >= MAX_REQUEST_VIDEOS) return { message: fmt(t.errTooManyVideos, { n: MAX_REQUEST_VIDEOS }) };
+
+    const file = await db.query<{ id: string }>(
+      `INSERT INTO files (clan_id, uploaded_by, purpose, file_name, content_type, size_bytes, data)
+       VALUES ($1, $2, 'donation_media', $3, $4, $5, $6) RETURNING id`,
+      [me.clanId, me.id, media.fileName, media.contentType, media.size, media.data],
+    );
+    await db.query(`INSERT INTO donation_media (request_id, file_id, kind, position) VALUES ($1, $2, $3::media_kind, $4)`, [
+      requestId,
+      file.rows[0].id,
+      media.kind,
+      have.next,
+    ]);
+    if (media.kind === "image") await syncCover(db, requestId);
+    return { success: "ok" };
+  });
+}
+
+/** After the uploads: refresh the pages that show the request. */
+export async function finishRequestMedia() {
+  await requireRole(...DONOR_ROLES);
+  refresh();
 }
 
 /** Anyone signed in (from any clan) records a donation they transferred, with proof. */

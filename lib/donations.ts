@@ -90,3 +90,14 @@ export function myDonations(userId: string) {
     [userId],
   );
 }
+
+/** A request's gallery, in order: photos and videos. Visible to every signed-in user. */
+export type MediaItem = { id: string; fileId: string; kind: "image" | "video" };
+
+export function getRequestMedia(requestId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return Promise.resolve([] as MediaItem[]);
+  return query<MediaItem>(
+    `SELECT id, file_id AS "fileId", kind::text AS kind FROM donation_media WHERE request_id = $1 ORDER BY position, created_at`,
+    [requestId],
+  );
+}

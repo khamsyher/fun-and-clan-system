@@ -682,11 +682,11 @@ async function main() {
       }
     }
     await savingsGroup({
-      code: "DEMO-SV1", name: "Market sellers' circle", description: "Six friends from the morning market, 300,000 each month.", amount: 300000, period: "monthly",
+      code: "MARKET", name: "Market sellers' circle", description: "Six friends from the morning market, 300,000 each month.", amount: 300000, period: "monthly",
       organizer: 89, members: [90, 91, 92, 10, 45], startDaysAgo: 62, roundsDone: 2, paidInCurrent: 3, started: true,
     });
     await savingsGroup({
-      code: "DEMO-SV2", name: "Young families weekly", description: "Small weekly savings for school costs.", amount: 50000, period: "weekly",
+      code: "WEEK52", name: "Young families weekly", description: "Small weekly savings for school costs.", amount: 50000, period: "weekly",
       organizer: 96, members: [97, 98], pending: [99], startDaysAgo: -9, roundsDone: 0, paidInCurrent: 0, started: false,
     });
 

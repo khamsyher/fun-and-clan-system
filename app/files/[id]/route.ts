@@ -5,46 +5,75 @@ import { isStaffRole, type Role } from "@/lib/definitions";
 
 /**
  * Serves an uploaded file. Who may see what:
- *  - donation photos and QR codes: every signed-in user (donation requests are cross-clan)
+ *  - donation photos, gallery photos/videos and QR codes: every signed-in user (donation requests are cross-clan)
  *  - donation slips: the donor who uploaded it and the person who asked for the donation
  *  - profile photos: the person themself, anyone in their clan, and the platform owner
  *  - identity documents (KYC): the person themself, their clan leader, and the platform owner who approves them
  *  - transfer slips: the member who uploaded it and their clan leader
  *  - savings QR codes: approved members of the group; savings slips: the payer and that round's receiver
+ *  - savings group rules: anyone who reached a forming group by its code, then its members
  *  - everything else (meeting minutes, payout proofs): signed-in users of the same clan
  * Anything not allowed answers 404, so ids can't be probed.
  */
-export async function GET(_req: NextRequest, ctx: RouteContext<"/files/[id]">) {
+export async function GET(req: NextRequest, ctx: RouteContext<"/files/[id]">) {
   const { id } = await ctx.params;
   const user = await getCurrentUser();
   if (!user) return new Response("Not signed in", { status: 401 });
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response("Not found", { status: 404 });
 
+  // Who may see it is decided before any of the file's bytes are read.
   const file = await queryOne<{
     file_name: string;
     content_type: string;
-    data: Buffer;
+    size_bytes: number;
     purpose: string;
     uploaded_by: string | null;
     clan_id: string | null;
-  }>(`SELECT file_name, content_type, data, purpose, uploaded_by, clan_id FROM files WHERE id = $1`, [id]);
+  }>(`SELECT file_name, content_type, size_bytes, purpose, uploaded_by, clan_id FROM files WHERE id = $1`, [id]);
   if (!file) return new Response("Not found", { status: 404 });
 
   const allowed = await canRead(id, file, user);
   if (!allowed) return new Response("Not found", { status: 404 });
 
   const headers: Record<string, string> = {
-    // Only JPG/PNG/WebP/PDF are ever stored (checked by content on upload), and nosniff stops reinterpretation.
+    // Only JPG/PNG/WebP/PDF and MP4/WebM/MOV are ever stored (checked by content on upload); nosniff stops reinterpretation.
     "Content-Type": file.content_type,
     "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.file_name)}`,
-    "Content-Length": String(file.data.length),
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "private, no-store",
   };
-  // Images get a locked-down policy; PDFs don't, because a strict CSP breaks the browser's PDF viewer.
+  // Images and videos get a locked-down policy; PDFs don't, because a strict CSP breaks the browser's PDF viewer.
   if (file.content_type.startsWith("image/")) headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'";
 
-  return new Response(new Uint8Array(file.data), { headers });
+  if (file.content_type.startsWith("video/")) {
+    headers["Content-Security-Policy"] = "default-src 'none'; media-src 'self'";
+    headers["Accept-Ranges"] = "bytes";
+    // Players ask for a video in pieces (Safari insists; every browser does it to seek). Only the
+    // requested piece is read from the database, so a 30 MB video isn't loaded for each request.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("range") ?? "");
+    if (range && (range[1] || range[2])) {
+      const size = Number(file.size_bytes);
+      let from = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+      let to = range[1] && range[2] ? Number(range[2]) : size - 1;
+      to = Math.min(to, size - 1);
+      if (from > to || from >= size) {
+        return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+      }
+      from = Math.max(0, from);
+      const part = await queryOne<{ chunk: Buffer }>(`SELECT substring(data FROM $2 FOR $3) AS chunk FROM files WHERE id = $1`, [
+        id,
+        from + 1,
+        to - from + 1,
+      ]);
+      headers["Content-Range"] = `bytes ${from}-${to}/${size}`;
+      headers["Content-Length"] = String(to - from + 1);
+      return new Response(new Uint8Array(part!.chunk), { status: 206, headers });
+    }
+  }
+
+  const whole = await queryOne<{ data: Buffer }>(`SELECT data FROM files WHERE id = $1`, [id]);
+  headers["Content-Length"] = String(whole!.data.length);
+  return new Response(new Uint8Array(whole!.data), { headers });
 }
 
 async function canRead(
@@ -52,7 +81,7 @@ async function canRead(
   file: { purpose: string; uploaded_by: string | null; clan_id: string | null },
   user: { id: string; role: Role; clanId: string | null },
 ) {
-  if (file.purpose === "donation_photo" || file.purpose === "donation_qr") return true;
+  if (file.purpose === "donation_photo" || file.purpose === "donation_qr" || file.purpose === "donation_media") return true;
 
   if (file.purpose === "donation_slip") {
     if (file.uploaded_by === user.id) return true;
@@ -88,6 +117,18 @@ async function canRead(
       [fileId, user.id],
     );
     return Boolean(member);
+  }
+  // A group's rules are read before joining: anyone who reached a still-forming group (by its
+  // invite code), and afterwards everyone who is or asked to be in it.
+  if (file.purpose === "savings_rules") {
+    if (file.uploaded_by === user.id) return true;
+    const ok = await queryOne(
+      `SELECT 1 FROM savings_groups g
+        WHERE g.rules_file_id = $1
+          AND (g.status = 'forming' OR EXISTS (SELECT 1 FROM savings_members m WHERE m.group_id = g.id AND m.user_id = $2))`,
+      [fileId, user.id],
+    );
+    return Boolean(ok);
   }
   if (file.purpose === "savings_slip") {
     if (file.uploaded_by === user.id) return true;

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { PageHeading } from "@/components/app-shell";
 import { requireRole } from "@/lib/dal";
 import { DONOR_ROLES } from "@/lib/definitions";
-import { getRequest } from "@/lib/donations";
+import { getRequest, getRequestMedia } from "@/lib/donations";
 import { getT } from "@/lib/i18n/server";
 import { RequestForm } from "../../new/request-form";
 
@@ -20,6 +20,7 @@ export default async function EditRequestPage({ params }: PageProps<"/donations/
   const request = await getRequest(id);
   // Only the person who asked can open this page; everyone else sees "not found".
   if (!request || request.created_by !== me.id || request.status === "cancelled") notFound();
+  const media = await getRequestMedia(request.id);
 
   return (
     <>
@@ -40,8 +41,8 @@ export default async function EditRequestPage({ params }: PageProps<"/donations/
             bankName: request.bank_name ?? "",
             accountName: request.account_name ?? "",
             accountNumber: request.account_number ?? "",
-            photoFileId: request.photo_file_id,
             qrFileId: request.qr_file_id,
+            media,
           }}
         />
       </div>

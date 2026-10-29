@@ -119,7 +119,7 @@ type DemoGroup = {
 
 const SAVINGS_GROUPS: DemoGroup[] = [
   {
-    code: "SAVE01",
+    code: "SAVE22",
     name: "Neighbours monthly savings",
     description: "Five neighbours saving together; each month one of us takes the pot.",
     amount: 500000,
@@ -129,7 +129,7 @@ const SAVINGS_GROUPS: DemoGroup[] = [
     state: { status: "active", roundsDone: 1, paidInNext: 2 },
   },
   {
-    code: "SAVE02",
+    code: "SAVE33",
     name: "Market friends weekly",
     description: "Stall holders at the morning market.",
     amount: 100000,
@@ -140,7 +140,7 @@ const SAVINGS_GROUPS: DemoGroup[] = [
     state: { status: "forming" },
   },
   {
-    code: "SAVE03",
+    code: "SAVE44",
     name: "Family circle",
     description: "Cousins helping each other with school fees.",
     amount: 200000,

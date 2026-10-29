@@ -1,3 +1,4 @@
+import { SavingsRules } from "@/components/savings-rules";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeading } from "@/components/app-shell";
@@ -7,7 +8,7 @@ import { requireRole } from "@/lib/dal";
 import { DONOR_ROLES } from "@/lib/definitions";
 import { formatKip } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
-import { getT } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
 import { getFormingGroupByCode, myMembership } from "@/lib/savings";
 import { normalizeInviteCode } from "@/lib/savings-rules";
 import { JoinForm } from "./join-form";
@@ -19,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 /** `/savings/join?code=AB3K7M` is the link organizers share; without a code it asks for one. */
 export default async function JoinSavingsPage({ searchParams }: PageProps<"/savings/join">) {
   const me = await requireRole(...DONOR_ROLES);
-  const [sp, t] = await Promise.all([searchParams, getT()]);
+  const [sp, t, locale] = await Promise.all([searchParams, getT(), getLocale()]);
   const s = t.savings;
 
   const raw = typeof sp.code === "string" ? sp.code : "";
@@ -63,6 +64,10 @@ export default async function JoinSavingsPage({ searchParams }: PageProps<"/savi
               {fmt(s.joinAbout, { organizer: group.organizer_name, amount: formatKip(group.amount), period: s.period[group.period], n: group.members })}
             </p>
             {group.description && <p className="mt-3 whitespace-pre-line text-ink">{group.description}</p>}
+            {/* The rules come before the button: asking to join means agreeing to them. */}
+            <div className="mt-5">
+              <SavingsRules rules={group.rules} fileId={group.rules_file_id} updatedAt={group.rules_updated_at} t={t} locale={locale} agreeNote={!alreadyIn} />
+            </div>
             <div className="mt-6">
               {alreadyIn ? (
                 <div className="space-y-3">

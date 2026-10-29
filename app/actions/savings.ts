@@ -20,7 +20,7 @@ type Dict = Awaited<ReturnType<typeof getT>>["savings"];
 type Db = Pick<PoolClient, "query">;
 
 /** Savings files belong to no clan: who may open them is decided by the group (see app/files/[id]/route.ts). */
-async function storeFile(db: PoolClient, userId: string, purpose: "savings_slip" | "savings_qr", upload: UploadCheck) {
+async function storeFile(db: PoolClient, userId: string, purpose: "savings_slip" | "savings_qr" | "savings_rules", upload: UploadCheck) {
   if (!upload.ok) return null;
   const r = await db.query<{ id: string }>(
     `INSERT INTO files (clan_id, uploaded_by, purpose, file_name, content_type, size_bytes, data)
@@ -72,6 +72,8 @@ async function readReceiving(formData: FormData, t: Dict, keepsQr = false) {
 function readGroupFields(formData: FormData, t: Dict) {
   const name = String(formData.get("name") ?? "").trim().slice(0, 100);
   const description = String(formData.get("description") ?? "").trim().slice(0, 1000) || null;
+  const rulesRaw = String(formData.get("rules") ?? "").trim();
+  const rules = rulesRaw.slice(0, 4000) || null;
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const amount = parseKip(amountRaw);
   const periodRaw = String(formData.get("period") ?? "");
@@ -79,13 +81,14 @@ function readGroupFields(formData: FormData, t: Dict) {
   const startDate = String(formData.get("startDate") ?? "").trim();
   const errors: Record<string, string[]> = {};
   if (name.length < 3) errors.name = [t.errName];
+  if (rulesRaw.length > 4000) errors.rules = [t.errRulesLong];
   if (!amount) errors.amount = [t.errAmount];
   if (!period) errors.period = [t.errPeriod];
   if (!isTodayOrLater(startDate, todayInLaos())) errors.startDate = [t.errStartDate];
   return {
     errors,
-    fields: { name, description, amount, period, startDate },
-    values: { name, description: description ?? "", amount: amountRaw, period: periodRaw, startDate },
+    fields: { name, description, rules, amount, period, startDate },
+    values: { name, description: description ?? "", rules: rules ?? "", amount: amountRaw, period: periodRaw, startDate },
   };
 }
 
@@ -95,8 +98,10 @@ export async function createGroup(_state: FormState, formData: FormData): Promis
   const t = (await getT()).savings;
   const group = readGroupFields(formData, t);
   const receiving = await readReceiving(formData, t);
+  const rulesDoc = await readUpload(formData.get("rulesFile"));
   const values = { ...group.values, ...receiving.values };
-  const errors = { ...group.errors, ...receiving.errors };
+  const errors: Record<string, string[]> = { ...group.errors, ...receiving.errors };
+  if (!rulesDoc.ok && rulesDoc.reason !== "missing") errors.rulesFile = [t.errRulesFile];
   if (Object.keys(errors).length) return { errors, values };
   const f = group.fields;
   const r = receiving.fields;
@@ -113,6 +118,10 @@ export async function createGroup(_state: FormState, formData: FormData): Promis
       groupId = g.rows[0]?.id ?? null;
     }
     if (!groupId) throw new Error("Could not create a unique invite code");
+    const rulesFileId = await storeFile(db, me.id, "savings_rules", rulesDoc);
+    if (f.rules || rulesFileId) {
+      await db.query(`UPDATE savings_groups SET rules = $2, rules_file_id = $3, rules_updated_at = now() WHERE id = $1`, [groupId, f.rules, rulesFileId]);
+    }
     const qrId = await storeFile(db, me.id, "savings_qr", receiving.qr);
     await db.query(
       `INSERT INTO savings_members (group_id, user_id, status, turn_no, bank_name, account_name, account_number, qr_file_id, decided_at)
@@ -138,7 +147,11 @@ export async function updateGroup(_state: FormState, formData: FormData): Promis
   const group = readGroupFields(formData, t);
   const values = group.values;
   if (!UUID_RE.test(groupId)) return { message: t.errState, values };
-  if (Object.keys(group.errors).length) return { errors: group.errors, values };
+  const rulesDoc = await readUpload(formData.get("rulesFile"));
+  const removeRulesFile = formData.get("removeRulesFile") === "on";
+  const errors: Record<string, string[]> = { ...group.errors };
+  if (!rulesDoc.ok && rulesDoc.reason !== "missing") errors.rulesFile = [t.errRulesFile];
+  if (Object.keys(errors).length) return { errors, values };
   const f = group.fields;
 
   const refused = await transaction(async (db): Promise<FormState | null> => {
@@ -161,6 +174,15 @@ export async function updateGroup(_state: FormState, formData: FormData): Promis
       f.period,
       f.startDate,
     ]);
+    // Rules: the date only moves when the text or the document actually changes.
+    const before = (await db.query<{ rules: string | null; rules_file_id: string | null }>(`SELECT rules, rules_file_id FROM savings_groups WHERE id = $1`, [groupId])).rows[0];
+    const newFileId = await storeFile(db, me.id, "savings_rules", rulesDoc);
+    const fileId = newFileId ?? (removeRulesFile ? null : before.rules_file_id);
+    if (before.rules !== f.rules || before.rules_file_id !== fileId) {
+      await db.query(`UPDATE savings_groups SET rules = $2, rules_file_id = $3, rules_updated_at = now() WHERE id = $1`, [groupId, f.rules, fileId]);
+      // The replaced or removed document is no longer referenced by anything.
+      if (before.rules_file_id && before.rules_file_id !== fileId) await db.query(`DELETE FROM files WHERE id = $1`, [before.rules_file_id]);
+    }
     await audit(db, me.id, "savings.updated", groupId);
     return null;
   });

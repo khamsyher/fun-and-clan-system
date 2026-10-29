@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { query, queryOne, transaction } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { canJoinClan } from "@/lib/access";
+import { clanRoom, lockedRoom } from "@/lib/member-limit";
 import { clanLeaderId, notify } from "@/lib/notify";
 import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
@@ -31,6 +32,8 @@ export async function requestJoinClan(_state: FormState, formData: FormData): Pr
   );
   if (!clan) return { errors: { clanCode: [t.auth.unknownClan] }, values };
   if (!clan.is_active) return { errors: { clanCode: [t.auth.clanInactive] }, values };
+  // A full clan can't take anyone, so say so now rather than leave the request waiting.
+  if ((await clanRoom(clan.id)).full) return { errors: { clanCode: [t.clanMembers.joinFull] }, values };
 
   const result = await transaction(async (db): Promise<FormState> => {
     // One request at a time, so nobody queues up at every clan at once.
@@ -78,6 +81,8 @@ export async function decideJoinRequest(formData: FormData) {
   if (!UUID.test(requestId)) return;
 
   await transaction(async (db) => {
+    // Approving adds a member: the member limit is counted under the clan lock first.
+    if (approve && (await lockedRoom(db, leader.clanId!)).full) return;
     const row = (
       await db.query<{ user_id: string }>(
         `SELECT user_id FROM clan_join_requests

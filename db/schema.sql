@@ -945,3 +945,43 @@ CREATE TABLE IF NOT EXISTS clan_policy_agreements (
   agreed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (policy_id, user_id)
 );
+
+-- ===========================================================================
+-- A clan leader can cap how many members their clan takes. NULL = no limit.
+-- Leaders are not counted; only active members are. Additive and re-runnable.
+-- ===========================================================================
+ALTER TABLE clans ADD COLUMN IF NOT EXISTS member_limit INT CHECK (member_limit IS NULL OR member_limit > 0);
+
+-- ===========================================================================
+-- Help requests carry a gallery: several photos and short videos, in order.
+-- The first photo is the cover, kept in donation_requests.photo_file_id so the
+-- list and shared-link previews keep working. Additive and re-runnable.
+-- ===========================================================================
+DO $$ BEGIN
+  CREATE TYPE media_kind AS ENUM ('image', 'video');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS donation_media (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID NOT NULL REFERENCES donation_requests(id) ON DELETE CASCADE,
+  file_id    UUID NOT NULL UNIQUE REFERENCES files(id) ON DELETE RESTRICT,
+  kind       media_kind NOT NULL,
+  position   INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS donation_media_request_idx ON donation_media (request_id, position, created_at);
+
+-- Requests from before the gallery: their single photo becomes the first gallery item.
+INSERT INTO donation_media (request_id, file_id, kind, position, created_at)
+SELECT r.id, r.photo_file_id, 'image', 0, r.created_at
+  FROM donation_requests r
+ WHERE r.photo_file_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM donation_media m WHERE m.file_id = r.photo_file_id);
+
+-- ===========================================================================
+-- A savings group's own rules: written text and/or a document (photo or PDF),
+-- shown to people before they ask to join. Additive and re-runnable.
+-- ===========================================================================
+ALTER TABLE savings_groups ADD COLUMN IF NOT EXISTS rules            TEXT;
+ALTER TABLE savings_groups ADD COLUMN IF NOT EXISTS rules_file_id    UUID REFERENCES files(id) ON DELETE SET NULL;
+ALTER TABLE savings_groups ADD COLUMN IF NOT EXISTS rules_updated_at TIMESTAMPTZ;

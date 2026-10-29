@@ -1,3 +1,4 @@
+import { SavingsRules } from "@/components/savings-rules";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -134,6 +135,9 @@ export default async function SavingsGroupPage({ params, searchParams }: PagePro
           </div>
         </PageHeading>
         {group.description && <p className="mt-3 max-w-[65ch] whitespace-pre-line text-ink">{group.description}</p>}
+        <div className="mt-5 max-w-3xl">
+          <SavingsRules rules={group.rules} fileId={group.rules_file_id} updatedAt={group.rules_updated_at} t={t} locale={locale} />
+        </div>
       </div>
 
       {/* ---------- Forming ---------- */}

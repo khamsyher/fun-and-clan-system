@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/dal";
 import { STAFF_ROLES, adminCreateUserSchema, isStaffRole, type FormState, type Role } from "@/lib/definitions";
 import { fmt } from "@/lib/i18n/config";
 import { getT } from "@/lib/i18n/server";
+import { clanRoom, lockedRoom } from "@/lib/member-limit";
 import { notify } from "@/lib/notify";
 import { hashPassword, temporaryPassword } from "@/lib/password";
 
@@ -82,6 +83,9 @@ export async function setClanLeader(_state: FormState, formData: FormData): Prom
         [target.clan_id, userId],
       );
       if (!others.rowCount) return { message: t.leaderLast };
+      // Stepping down makes them a member, so it takes one of the clan's member places.
+      const room = await lockedRoom(db, target.clan_id);
+      if (room.full) return { message: fmt(t.clanFull, { limit: room.limit ?? 0 }) };
       await db.query(
         `UPDATE users SET role = 'member', session_version = session_version + 1, updated_at = now() WHERE id = $1`,
         [userId],
@@ -241,6 +245,11 @@ export async function createUser(_state: FormState, formData: FormData): Promise
     const clan = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM clans WHERE id = $1`, [d.clanId]);
     if (!clan) return { errors: { clanId: [t.leaderPickClan] }, values };
     if (!clan.is_active) return { errors: { clanId: [t.leaderClanInactive] }, values };
+    // A new member takes one of the clan's places; a leader doesn't.
+    if (d.role === "member") {
+      const room = await clanRoom(d.clanId);
+      if (room.full) return { errors: { clanId: [fmt(t.clanFull, { limit: room.limit ?? 0 })] }, values };
+    }
     clanId = d.clanId;
   }
 

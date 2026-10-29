@@ -8,7 +8,8 @@ import { FileIcon } from "@/components/icons";
 import { Notice } from "@/components/ui";
 import { requireRole } from "@/lib/dal";
 import { isStaffRole } from "@/lib/definitions";
-import { getRequest, listDonations } from "@/lib/donations";
+import { getRequest, getRequestMedia, listDonations } from "@/lib/donations";
+import { MediaGallery } from "@/components/media-gallery";
 import { formatDate, formatKip } from "@/lib/format";
 import { fmt } from "@/lib/i18n/config";
 import { getLocale, getT } from "@/lib/i18n/server";
@@ -32,7 +33,7 @@ export default async function DonationRequestPage({ params, searchParams }: Page
   const publicUrl = await shareUrl(request.id);
 
   const isOwner = request.created_by === me.id;
-  const donations = await listDonations(request.id, me.id, isOwner);
+  const [donations, media] = await Promise.all([listDonations(request.id, me.id, isOwner), getRequestMedia(request.id)]);
   const pending = donations.filter((x) => x.status === "pending");
   const confirmed = donations.filter((x) => x.status === "confirmed");
   const myPending = pending.filter((x) => x.donor_id === me.id);
@@ -85,10 +86,7 @@ export default async function DonationRequestPage({ params, searchParams }: Page
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="space-y-4">
-          {request.photo_file_id && (
-            // eslint-disable-next-line @next/next/no-img-element -- private, auth-checked upload
-            <img src={`/files/${request.photo_file_id}`} alt="" className="max-h-96 w-full rounded-xl border border-line object-cover" />
-          )}
+          <MediaGallery items={media} />
           <section className="rounded-xl border border-line bg-surface p-5 sm:p-6">
             <h2 className="font-semibold text-ink">{d.story}</h2>
             <p className="mt-2 leading-relaxed whitespace-pre-wrap text-ink-soft">{request.story}</p>
