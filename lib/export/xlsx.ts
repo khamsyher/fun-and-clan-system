@@ -125,6 +125,27 @@ export async function platformWorkbook(r: PlatformReport, t: Dictionary, locale:
   header(f, [rt.colMonth, rt.colEvents, rt.colFeesTotal, rt.colFeesReceived], [12, 10, 16, 16]);
   for (const m of r.months) money(f.addRow([m.month, Number(m.events), Number(m.fees), Number(m.received)]), 3, 4);
 
+  const u = wb.addWorksheet(rt.sheetUnpaid);
+  titleBlock(u, rt.unpaidTitle, period);
+  header(u, [rt.colClan, rt.colEvent, rt.colMember, rt.colPhone, t.admin.colStatus, rt.colOwes], [30, 34, 26, 16, 16, 16]);
+  for (const clan of r.unpaid)
+    for (const ev of clan.events)
+      for (const p of ev.people)
+        money(
+          u.addRow([
+            `${clan.name} (${clan.code})`,
+            `${fmt(t.events.eventNo, { n: ev.no })} · ${ev.deceased}`,
+            p.name,
+            p.phone,
+            p.status === "carried" ? rt.billCarried : rt.billUnpaid,
+            p.amount,
+          ]),
+          6,
+        );
+  const uTotal = u.addRow([rt.totals, "", "", "", "", r.totals.unpaid]);
+  uTotal.font = { bold: true };
+  money(uTotal, 6);
+
   const s = wb.addWorksheet(rt.sheetSavings);
   titleBlock(s, rt.savingsTitle, period);
   header(

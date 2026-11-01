@@ -691,6 +691,19 @@
     "viaSlip": "Transfer slip"
   },
   "reports": {
+    "colUnpaid": "Unpaid",
+    "unpaidTitle": "Unpaid by clan and event",
+    "unpaidAside": "{n} clans · {total}",
+    "unpaidLede": "Households that still owe on events reported in this period. \"Not paid yet\": the collection is still open. \"Carried debt\": it closed unpaid, and the debt follows them to later bills. Click a name to open the account.",
+    "unpaidNone": "Nobody owes anything on events reported in this period.",
+    "unpaidClanLine": "{households} households owe · {events} events",
+    "unpaidEventLine": "{n} of {total} households unpaid · reported {date}",
+    "colMember": "Member",
+    "colPhone": "Phone",
+    "colOwes": "Owes",
+    "billUnpaid": "Not paid yet",
+    "billCarried": "Carried debt",
+    "sheetUnpaid": "Unpaid",
     "savingsTitle": "Savings groups",
     "savingsAside": "{n} groups · {fresh} new in this period",
     "savingsLede": "Every savings group that existed by the end of the period, with what happened in it during the period. Members pay each other directly; the platform's share is the fee on each finished round.",
@@ -1245,6 +1258,9 @@
     "docFinal": "Once sent, a document stays on your account. If something is wrong with it, the platform turns it down and you add another."
   },
   "kyc": {
+    "headerAction": "Verify your identity",
+    "headerRejected": "Document not accepted — add another",
+    "headerWaiting": "Identity check waiting",
     "notRequired": "Not required (platform staff)",
     "notRequiredBody": "Platform staff don't need to verify their identity.",
     "metaTitle": "Identity checks",

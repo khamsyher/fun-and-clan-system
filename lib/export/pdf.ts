@@ -346,6 +346,35 @@ export async function platformPdf(r: PlatformReport, t: Dictionary, locale: Loca
       r.months.map((m) => [m.month, m.events, p.kip(Number(m.fees)), p.kip(Number(m.received))]),
     );
 
+  p.section(rt.unpaidTitle);
+  if (r.unpaid.length === 0) p.note(rt.unpaidNone);
+  else
+    p.table(
+      [
+        { label: rt.colClan, width: 22 },
+        { label: rt.colEvent, width: 24 },
+        { label: rt.colMember, width: 20 },
+        { label: rt.colPhone, width: 12 },
+        { label: t.admin.colStatus, width: 10 },
+        { label: rt.colOwes, width: 12, align: "right" },
+      ],
+      [
+        ...r.unpaid.flatMap((clan) =>
+          clan.events.flatMap((ev) =>
+            ev.people.map((x) => [
+              `${clan.name} (${clan.code})`,
+              `${fmt(t.events.eventNo, { n: ev.no })} · ${ev.deceased}`,
+              x.name,
+              x.phone,
+              x.status === "carried" ? rt.billCarried : rt.billUnpaid,
+              p.kip(x.amount),
+            ]),
+          ),
+        ),
+        [{ text: rt.totals, bold: true }, "", "", "", "", { text: p.kip(r.totals.unpaid), bold: true }],
+      ],
+    );
+
   p.section(rt.savingsTitle);
   if (r.savings.groups.length === 0) p.note(rt.noSavings);
   else {

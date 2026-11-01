@@ -62,3 +62,21 @@ export async function countPendingKyc() {
   const row = await queryOne<{ n: string }>(`SELECT COUNT(*) AS n FROM user_documents WHERE status = 'pending'`);
   return Number(row?.n ?? 0);
 }
+
+/**
+ * Where someone's identity check stands, for the warning beside their name in the header.
+ * Same order as overallKyc: approved, then waiting, then not accepted, then nothing sent.
+ */
+export async function myKycState(userId: string): Promise<"approved" | "pending" | "rejected" | "none"> {
+  const row = await queryOne<{ state: "approved" | "pending" | "rejected" | "none" }>(
+    `SELECT CASE
+              WHEN bool_or(status = 'approved') THEN 'approved'
+              WHEN bool_or(status = 'pending')  THEN 'pending'
+              WHEN bool_or(status = 'rejected') THEN 'rejected'
+              ELSE 'none'
+            END AS state
+       FROM user_documents WHERE user_id = $1`,
+    [userId],
+  );
+  return row?.state ?? "none";
+}

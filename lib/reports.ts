@@ -136,9 +136,13 @@ export async function getClanReport(clanId: string, { from, to }: Range) {
 
 export type PlatformReport = Awaited<ReturnType<typeof getPlatformReport>>;
 
-/** Totals only, per clan and per month — the super admin never sees individual members' payments. */
+/**
+ * Totals per clan and per month, plus — for platform staff only — who still owes on which
+ * event, so unpaid bills can be followed up. Individual payments that were made stay private;
+ * only what is still unpaid is listed.
+ */
 export async function getPlatformReport({ from, to }: Range) {
-  const [clans, months, savings] = await Promise.all([
+  const [clans, months, savings, unpaidRows] = await Promise.all([
     query<{
       name: string;
       code: string;
@@ -213,13 +217,60 @@ export async function getPlatformReport({ from, to }: Range) {
         ORDER BY g.created_at`,
       [1, from, to],
     ),
+    // Bills still unpaid on events reported in the period: 'unpaid' while the collection is open,
+    // 'carried' once it closed (the debt follows the member to later bills).
+    query<{
+      clan_code: string;
+      clan_name: string;
+      event_id: string;
+      event_no: number;
+      deceased_name: string;
+      event_status: string;
+      reported_at: Date;
+      bills: string;
+      member_id: string;
+      member_name: string;
+      member_phone: string;
+      amount: string;
+      bill_status: "unpaid" | "carried";
+    }>(
+      `SELECT c.code AS clan_code, c.name AS clan_name, e.id AS event_id, e.event_no, e.deceased_name, e.status::text AS event_status,
+              e.reported_at, (SELECT COUNT(*) FROM event_bills x WHERE x.event_id = e.id AND x.status <> 'void') AS bills,
+              u.id AS member_id, u.full_name AS member_name, u.phone AS member_phone, b.amount, b.status::text AS bill_status
+         FROM event_bills b
+         JOIN death_events e ON e.id = b.event_id
+         JOIN clans c ON c.id = b.clan_id
+         JOIN users u ON u.id = b.member_id
+        WHERE $1::int = 1 AND b.status IN ('unpaid', 'carried') AND e.status <> 'cancelled'
+          AND e.reported_at >= ${START} AND e.reported_at < ${END}
+        ORDER BY lower(c.name), e.event_no, lower(u.full_name)`,
+      [1, from, to],
+    ),
   ]);
 
   const n = (rows: Record<string, string | number | boolean>[], k: string) => rows.reduce((s, r) => s + Number(r[k]), 0);
+  type UnpaidEvent = { id: string; no: number; deceased: string; status: string; reportedAt: Date; bills: number; total: number; people: { id: string; name: string; phone: string; amount: number; status: "unpaid" | "carried" }[] };
+  const byClan = new Map<string, { code: string; name: string; total: number; households: Set<string>; events: Map<string, UnpaidEvent> }>();
+  for (const row of unpaidRows) {
+    const clan = byClan.get(row.clan_code) ?? { code: row.clan_code, name: row.clan_name, total: 0, households: new Set<string>(), events: new Map() };
+    byClan.set(row.clan_code, clan);
+    const ev =
+      clan.events.get(row.event_id) ??
+      { id: row.event_id, no: row.event_no, deceased: row.deceased_name, status: row.event_status, reportedAt: row.reported_at, bills: Number(row.bills), total: 0, people: [] };
+    clan.events.set(row.event_id, ev);
+    const amount = Number(row.amount);
+    ev.people.push({ id: row.member_id, name: row.member_name, phone: row.member_phone, amount, status: row.bill_status });
+    ev.total += amount;
+    clan.total += amount;
+    clan.households.add(row.member_id);
+  }
+  const unpaid = [...byClan.values()].map((x) => ({ code: x.code, name: x.name, total: x.total, households: x.households.size, events: [...x.events.values()] }));
+
   return {
     from,
     to,
-    clans,
+    clans: clans.map((x) => ({ ...x, unpaid: byClan.get(x.code)?.total ?? 0 })),
+    unpaid,
     months,
     savings: {
       groups: savings,
@@ -234,6 +285,7 @@ export async function getPlatformReport({ from, to }: Range) {
       },
     },
     totals: {
+      unpaid: unpaid.reduce((s, x) => s + x.total, 0),
       members: n(clans, "members"),
       events: n(clans, "events"),
       collected: n(clans, "collected"),

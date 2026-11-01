@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHeading, Section } from "@/components/app-shell";
 import { ReportRange } from "@/components/report-range";
 import { requireRole } from "@/lib/dal";
@@ -38,13 +39,14 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
 
       <Section title={rt.clans}>
         <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
-          <table className="w-full min-w-[48rem] text-left text-sm">
+          <table className="w-full min-w-[54rem] text-left text-sm">
             <thead className="border-b border-line bg-brand-wash/60 text-xs text-ink-soft">
               <tr>
                 <th className="px-4 py-3 font-medium">{rt.colClan}</th>
                 <th className="px-4 py-3 font-medium">{rt.colMode}</th>
                 <th className="px-4 py-3 text-right font-medium">{rt.colMembersNow}</th>
                 <th className="px-4 py-3 text-right font-medium">{rt.colEvents}</th>
+                <th className="px-4 py-3 text-right font-medium">{rt.colUnpaid}</th>
                 <th className="px-4 py-3 text-right font-medium">{rt.colCollected}</th>
                 <th className="px-4 py-3 text-right font-medium">{rt.colPayout}</th>
                 <th className="px-4 py-3 text-right font-medium">{rt.colFeesOwed}</th>
@@ -61,6 +63,15 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
                   <td className="px-4 py-3 text-ink-soft">{c.fund_mode}</td>
                   <td className="px-4 py-3 text-right">{formatNumber(c.members)}</td>
                   <td className="px-4 py-3 text-right">{formatNumber(c.events)}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {c.unpaid > 0 ? (
+                      <a href={`#unpaid-${c.code}`} className="font-semibold text-bad underline-offset-2 hover:underline">
+                        {formatKip(c.unpaid)}
+                      </a>
+                    ) : (
+                      <span className="text-muted">{formatKip(0)}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(c.collected)}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(c.paid_out)}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap text-warn">{formatKip(c.fees_owed)}</td>
@@ -74,6 +85,7 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
                 <td />
                 <td className="px-4 py-3 text-right">{formatNumber(r.totals.members)}</td>
                 <td className="px-4 py-3 text-right">{formatNumber(r.totals.events)}</td>
+                <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(r.totals.unpaid)}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(r.totals.collected)}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(r.totals.paidOut)}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">{formatKip(r.totals.feesOwed)}</td>
@@ -82,6 +94,77 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
             </tfoot>
           </table>
         </div>
+      </Section>
+
+      {/* Who still owes on which event — for following up with each clan's leader. */}
+      <Section title={rt.unpaidTitle} aside={r.unpaid.length ? fmt(rt.unpaidAside, { n: r.unpaid.length, total: formatKip(r.totals.unpaid) }) : undefined}>
+        <p className="-mt-2 mb-4 max-w-[65ch] text-sm text-ink-soft">{rt.unpaidLede}</p>
+        {r.unpaid.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-6 text-center text-sm text-ink-soft">{rt.unpaidNone}</p>
+        ) : (
+          <div className="space-y-3">
+            {r.unpaid.map((clan) => (
+              <details key={clan.code} id={`unpaid-${clan.code}`} className="group scroll-mt-24 rounded-xl border border-line bg-surface" open={r.unpaid.length <= 3}>
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0">
+                    <span className="font-medium text-ink">{clan.name}</span>{" "}
+                    <span className="text-xs font-semibold tracking-wide text-brand">{clan.code}</span>
+                    <span className="block text-xs text-muted">{fmt(rt.unpaidClanLine, { households: clan.households, events: clan.events.length })}</span>
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span className="tabular font-semibold text-bad">{formatKip(clan.total)}</span>
+                    <span className="text-ink-soft transition-transform group-open:rotate-90" aria-hidden="true">›</span>
+                  </span>
+                </summary>
+                <div className="space-y-4 border-t border-line px-5 py-4">
+                  {clan.events.map((ev) => (
+                    <div key={ev.id}>
+                      <p className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                        <span className="font-medium text-ink">
+                          {fmt(t.events.eventNo, { n: ev.no })} · {ev.deceased}
+                        </span>
+                        <span className="text-xs text-muted">
+                          {fmt(rt.unpaidEventLine, { n: ev.people.length, total: ev.bills, date: formatDate(ev.reportedAt, locale) })} ·{" "}
+                          <span className="tabular font-semibold text-ink">{formatKip(ev.total)}</span>
+                        </span>
+                      </p>
+                      <div className="mt-2 overflow-x-auto rounded-lg border border-line">
+                        <table className="w-full min-w-[30rem] text-left text-sm">
+                          <thead className="bg-sunken/60 text-xs text-ink-soft">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">{rt.colMember}</th>
+                              <th className="px-3 py-2 font-medium">{rt.colPhone}</th>
+                              <th className="px-3 py-2 font-medium">{t.admin.colStatus}</th>
+                              <th className="px-3 py-2 text-right font-medium">{rt.colOwes}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-line">
+                            {ev.people.map((p) => (
+                              <tr key={p.id}>
+                                <td className="px-3 py-2">
+                                  <Link href={`/admin/users/${p.id}`} className="font-medium text-ink hover:text-brand">
+                                    {p.name}
+                                  </Link>
+                                </td>
+                                <td className="tabular px-3 py-2 text-ink-soft">{p.phone}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`text-xs font-medium ${p.status === "carried" ? "text-bad" : "text-warn"}`}>
+                                    {p.status === "carried" ? rt.billCarried : rt.billUnpaid}
+                                  </span>
+                                </td>
+                                <td className="tabular px-3 py-2 text-right whitespace-nowrap text-ink">{formatKip(p.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section title={rt.feesByMonth}>

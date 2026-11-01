@@ -3,7 +3,7 @@ import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { getT } from "@/lib/i18n/server";
 import type { CurrentUser } from "@/lib/dal";
-import { isStaffRole } from "@/lib/definitions";
+import { ROLE_HOME, isStaffRole } from "@/lib/definitions";
 import { BrandName } from "./brand";
 import { ChatIcon, LogoutIcon } from "./icons";
 import { LanguageSwitcher } from "./language-switcher";
@@ -11,11 +11,11 @@ import { NotificationBell } from "./notification-bell";
 import { getLocale } from "@/lib/i18n/server";
 import { renderNotification } from "@/lib/notification-text";
 import { listNotifications, unreadCount } from "@/lib/notify";
-import { countPendingKyc } from "@/lib/kyc";
+import { countPendingKyc, myKycState } from "@/lib/kyc";
+import { needsIdentityCheck } from "@/lib/access";
 import { countPendingLeaderRequests } from "@/lib/leader-requests";
 import { countPendingPolicies } from "@/lib/policies";
 import { unreadForUser, unreadThreadsForStaff } from "@/lib/support";
-import { AreaNav } from "./area-nav";
 import { MobileNav, SideNav } from "./side-nav";
 import { areasFor } from "@/lib/navigation";
 export async function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
@@ -31,6 +31,10 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
     // Staff: conversations waiting on them. Everyone else: replies they haven't read.
     staff ? unreadThreadsForStaff() : unreadForUser(user.id),
   ]);
+  // Not verified yet: a warning beside their name until they are (staff are never asked).
+  const identity = needsIdentityCheck(user) && !user.kycApproved ? await myKycState(user.id) : "approved";
+  const identityLine =
+    identity === "none" ? t.kyc.headerAction : identity === "rejected" ? t.kyc.headerRejected : identity === "pending" ? t.kyc.headerWaiting : null;
   const initials = user.fullName
     .split(/\s+/)
     .slice(0, 2)
@@ -62,11 +66,23 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
             </Link>
             <NotificationBell items={recent.map((n) => renderNotification(n, t, locale))} unread={unread} />
             {/* Account left the tabs when they became feature areas, so the whole name block leads there. */}
-            <Link href="/account" aria-label={t.nav.account} className="group flex items-center gap-3 rounded-full">
+            <Link
+              href={identityLine ? "/account#identity" : "/account"}
+              aria-label={identityLine ? `${t.nav.account} — ${identityLine}` : t.nav.account}
+              title={identityLine ?? undefined}
+              className="group flex items-center gap-3 rounded-full"
+            >
               <span className="hidden text-right leading-tight lg:block">
                 <span className="block text-sm font-medium text-ink">{user.fullName}</span>
-                <span className="block text-xs text-muted group-hover:text-brand">{t.nav.account}</span>
+                {identityLine ? (
+                  <span className={`block text-xs font-medium ${identity === "pending" ? "text-brand" : "text-warn"} group-hover:underline`}>
+                    {identityLine}
+                  </span>
+                ) : (
+                  <span className="block text-xs text-muted group-hover:text-brand">{t.nav.account}</span>
+                )}
               </span>
+              <span className="relative shrink-0">
               <span
                 className={`flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ring-2 ring-gold/40 ring-offset-2 ring-offset-paper transition-transform group-hover:scale-105 ${
                   user.photoFileId ? "bg-sunken" : "bg-brand text-white"
@@ -78,6 +94,18 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
                 ) : (
                   initials
                 )}
+              </span>
+              {/* The badge stays visible on phones, where the line under the name is hidden. */}
+              {identityLine && (
+                <span
+                  aria-hidden="true"
+                  className={`absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[0.65rem] leading-none font-bold text-white ring-2 ring-paper ${
+                    identity === "pending" ? "bg-brand-bright" : "bg-warn"
+                  }`}
+                >
+                  {identity === "pending" ? "…" : "!"}
+                </span>
+              )}
               </span>
             </Link>
             <form action={logout}>
@@ -92,58 +120,51 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
           </div>
   );
 
-  // The platform owner works across many admin pages, so their menu is a sidebar
-  // (a slide-in drawer on small screens) instead of area tabs.
-  if (user.role === "super_admin") {
-    return (
-      <div className="min-h-dvh lg:flex">
-        <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface lg:flex">
-          <div className="flex h-16 shrink-0 items-center border-b border-line px-5">
-            <Link href="/admin">
-              <BrandName />
-            </Link>
-          </div>
-          <div className="flex-1 overflow-y-auto px-3 py-5">
-            <SideNav areas={areas} />
-          </div>
-        </aside>
-        <div className="min-w-0 flex-1">
-          {/* Solid, not blurred: a backdrop filter would trap the drawer (position: fixed) inside the header. */}
-          <header className="sticky top-0 z-20 border-b border-line bg-paper">
-            <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
-              <div className="flex min-w-0 items-center gap-2 lg:hidden">
-                <MobileNav areas={areas} brand={<BrandName />} />
-                <BrandName />
-              </div>
-              <div className="hidden lg:block" />
-              {controls}
-            </div>
-          </header>
-          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
-        </div>
-      </div>
-    );
-  }
-
+  // Everyone's menu is a sidebar: each area a titled group of its pages (or one link when it has
+  // a single page). Fixed on large screens; a slide-in drawer behind a menu button on small ones.
+  const home = ROLE_HOME[user.role];
+  const clanLine = user.clanName && (
+    <p className="mt-0.5 truncate text-xs text-ink-soft" title={user.clanName}>
+      {user.clanName}
+    </p>
+  );
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-20 border-b border-line bg-paper/90 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-4">
+    <div className="min-h-dvh lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface lg:flex">
+        <div className="flex min-h-16 shrink-0 flex-col justify-center border-b border-line px-5 py-3">
+          <Link href={home}>
             <BrandName />
-            {user.clanName && (
-              <span className="hidden min-w-0 truncate border-l border-line-strong pl-4 text-sm text-ink-soft md:block">
-                {user.clanName}
-              </span>
-            )}
+          </Link>
+          {clanLine}
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-5">
+          <SideNav areas={areas} />
+        </div>
+      </aside>
+      <div className="min-w-0 flex-1">
+        {/* Solid, not blurred: a backdrop filter would trap the drawer (position: fixed) inside the header. */}
+        <header className="sticky top-0 z-20 border-b border-line bg-paper">
+          <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-2 lg:hidden">
+              <MobileNav
+                areas={areas}
+                brand={
+                  <div className="min-w-0">
+                    <BrandName />
+                    {clanLine}
+                  </div>
+                }
+              />
+              <Link href={home} className="min-w-0">
+                <BrandName />
+              </Link>
+            </div>
+            <div className="hidden lg:block" />
+            {controls}
           </div>
-          {controls}
-        </div>
-        <div className="mx-auto max-w-6xl px-2 sm:px-4">
-          <AreaNav areas={areas} />
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+        </header>
+        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+      </div>
     </div>
   );
 }

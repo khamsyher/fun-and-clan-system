@@ -15,7 +15,7 @@ function itemsOf(area: NavArea): Item[] {
 }
 
 /**
- * The platform owner's menu as a sidebar: each area with sections becomes a titled group,
+ * The menu as a sidebar, for everyone: each area with sections becomes a titled group,
  * an area without sections a single link. Used fixed on large screens and inside the drawer.
  */
 export function SideNav({ areas }: { areas: NavArea[] }) {

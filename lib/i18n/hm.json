@@ -691,6 +691,19 @@
     "viaSlip": "Daim ntawv xa nyiaj"
   },
   "reports": {
+    "colUnpaid": "Tsis tau them",
+    "unpaidTitle": "Tsis tau them raws xeem thiab xwm txheej",
+    "unpaidAside": "{n} lub xeem · {total}",
+    "unpaidLede": "Cov tsev neeg tseem tshuav rau cov xwm txheej qhia hauv lub sij hawm no. \"Tsis tau them\": tseem sau nyiaj. \"Nuj nqis\": kaw lawm tab sis tsis tau them, cov nuj nqis yuav ua raws mus rau daim nqi tom ntej. Nias lub npe kom qhib tus account.",
+    "unpaidNone": "Tsis muaj leej twg tshuav rau cov xwm txheej qhia hauv lub sij hawm no.",
+    "unpaidClanLine": "{households} tsev neeg tshuav · {events} xwm txheej",
+    "unpaidEventLine": "{n} ntawm {total} tsev neeg tsis tau them · qhia {date}",
+    "colMember": "Tswv cuab",
+    "colPhone": "Xov tooj",
+    "colOwes": "Tshuav",
+    "billUnpaid": "Tsis tau them",
+    "billCarried": "Nuj nqis",
+    "sheetUnpaid": "Tsis tau them",
     "savingsTitle": "Pab pawg txuag nyiaj",
     "savingsAside": "{n} pab pawg · {fresh} tshiab hauv lub sij hawm no",
     "savingsLede": "Txhua pab pawg txuag nyiaj uas muaj txog thaum kawg ntawm lub sij hawm, nrog rau yam tshwm sim hauv lub sij hawm. Cov tswv cuab them ib leeg ncaj qha; platform tau tus nqi ntawm txhua zaug tiav.",
@@ -1245,6 +1258,9 @@
     "docFinal": "Thaum xa lawm, daim ntawv nyob hauv koj tus account mus li. Yog muaj teeb meem, lub platform tsis txais thiab koj ntxiv dua ib daim."
   },
   "kyc": {
+    "headerAction": "Txheeb koj tus kheej",
+    "headerRejected": "Daim ntawv tsis tau txais — ntxiv ib daim",
+    "headerWaiting": "Tos txheeb tus kheej",
     "notRequired": "Tsis tas (neeg ua haujlwm platform)",
     "notRequiredBody": "Cov neeg ua haujlwm platform tsis tas txheeb tus kheej.",
     "metaTitle": "Kuaj tus kheej",
