@@ -38,6 +38,9 @@ export function memberOpenItems(clanId: string, memberId: string) {
 
 export type SlipRow = {
   id: string;
+  clan_id: string;
+  clan_name: string;
+  clan_code: string;
   member_id: string;
   member_name: string;
   member_phone: string;
@@ -60,7 +63,8 @@ export type SlipRow = {
 };
 
 const SLIP_SELECT = `
-  SELECT s.id, s.member_id, u.full_name AS member_name, u.phone AS member_phone, s.status, s.amount_claimed,
+  SELECT s.id, s.clan_id, c.name AS clan_name, c.code AS clan_code,
+         s.member_id, u.full_name AS member_name, u.phone AS member_phone, s.status, s.amount_claimed,
          s.transfer_date, s.note, s.review_note, s.reviewed_at, s.created_at, s.file_id, f.content_type,
          s.include_debt, b.status AS bill_status, e.event_no, e.deceased_name, p.label,
          COALESCE(b.amount, d.amount) AS expected,
@@ -69,6 +73,7 @@ const SLIP_SELECT = `
          ELSE 0 END AS debt
     FROM payment_slips s
     JOIN users u ON u.id = s.member_id
+    JOIN clans c ON c.id = s.clan_id
     JOIN files f ON f.id = s.file_id
     LEFT JOIN event_bills b ON b.id = s.bill_id
     LEFT JOIN death_events e ON e.id = b.event_id
@@ -82,6 +87,16 @@ export function clanSlips(clanId: string, status: "pending" | "reviewed") {
       ORDER BY ${status === "pending" ? "s.created_at" : "s.reviewed_at DESC"}
       LIMIT 100`,
     [clanId],
+  );
+}
+
+/** Pending slips across all clans for platform staff. */
+export function platformSlips(status: "pending" | "reviewed") {
+  return query<SlipRow>(
+    `${SLIP_SELECT}
+      WHERE ${status === "pending" ? "s.status = 'pending'" : "s.status <> 'pending'"}
+      ORDER BY ${status === "pending" ? "s.created_at" : "s.reviewed_at DESC"}
+      LIMIT 100`,
   );
 }
 

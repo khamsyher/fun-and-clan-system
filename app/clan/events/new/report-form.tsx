@@ -7,7 +7,15 @@ import { Field, Notice, SubmitButton, TextAreaField } from "@/components/ui";
 
 export type PersonOption = { value: string; label: string };
 
-export function ReportDeathForm({ people, mode }: { people: { members: PersonOption[]; family: PersonOption[] }; mode: "A" | "B" }) {
+export function ReportDeathForm({
+  people,
+  mode,
+  clanId,
+}: {
+  people: { members: PersonOption[]; family: PersonOption[] };
+  mode: "A" | "B";
+  clanId?: string;
+}) {
   const [state, action] = useActionState(reportDeath, undefined);
   const t = useT().events;
   const v = state?.values;
@@ -17,6 +25,7 @@ export function ReportDeathForm({ people, mode }: { people: { members: PersonOpt
 
   return (
     <form action={action} className="space-y-5" noValidate>
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
 
       <div>

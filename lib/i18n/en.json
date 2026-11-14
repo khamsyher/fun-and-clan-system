@@ -127,6 +127,7 @@
     "total": "{n} total",
     "noClans": "No clans yet",
     "noClansBody": "Create the first clan and its leader account with the form beside this list.",
+    "chooseClan": "Choose an active clan to continue.",
     "colClan": "Clan",
     "colLeader": "Leader",
     "colMembers": "Members",
@@ -277,7 +278,9 @@
     "owesBody": "{open} for open collections and {debt} earlier debt. Please pay your clan leader.",
     "openCollections": "Open collections",
     "noOpen": "No collection is open right now.",
-    "payWithSlip": "Pay with a transfer slip"
+    "payWithSlip": "Pay with a transfer slip",
+    "rosterLede": "See your clan leader and active members.",
+    "noMembers": "No active members are listed yet."
   },
   "nav": {
     "members": "Members",
@@ -426,6 +429,12 @@
     "report": "Report a death",
     "empty": "No events yet",
     "emptyBody": "When a member or a member's family passes away, report it here.",
+    "search": "Search",
+    "adminSearchPlaceholder": "Person, clan name or clan code",
+    "allStatuses": "All statuses",
+    "noSearchResults": "No events match this search.",
+    "platformLimited": "Showing the newest 500 matching events. Search by person or clan to find older events.",
+    "waitingApprover": "A different staff account must approve this payout.",
     "eventNo": "Event #{n}",
     "status": {
       "collecting": "Collecting",
@@ -700,6 +709,12 @@
     "unpaidEventLine": "{n} of {total} households unpaid · reported {date}",
     "colMember": "Member",
     "colPhone": "Phone",
+    "membersReportTitle": "All clan members",
+    "membersReportLede": "Detailed roster of member accounts across every clan, including contact details, position and account status.",
+    "membersReportTotal": "members in this report",
+    "membersReportPosition": "Position",
+    "membersReportPassedAway": "Passed away",
+    "noMembersReport": "There are no member accounts to report.",
     "colOwes": "Owes",
     "billUnpaid": "Not paid yet",
     "billCarried": "Carried debt",
@@ -782,7 +797,8 @@
     "sheetLedger": "Ledger",
     "sheetContributions": "Contributions",
     "sheetClans": "Clans",
-    "sheetFees": "Fees by month"
+    "sheetFees": "Fees by month",
+    "sheetMembers": "Members"
   },
   "donations": {
     "fMedia": "Photos and videos",

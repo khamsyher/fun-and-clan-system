@@ -5,13 +5,14 @@ import { decidePayout } from "@/app/actions/payouts";
 import { useT } from "@/components/i18n-provider";
 import { Notice, TextAreaField } from "@/components/ui";
 
-export function DecisionForm({ payoutId }: { payoutId: string }) {
+export function DecisionForm({ payoutId, clanId }: { payoutId: string; clanId?: string }) {
   const [state, action, pending] = useActionState(decidePayout, undefined);
   const t = useT().approvals;
 
   return (
     <form action={action} className="space-y-4" noValidate>
       <input type="hidden" name="payoutId" value={payoutId} />
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       <TextAreaField label={t.note} name="note" placeholder={t.notePlaceholder} errors={state?.errors?.note} maxLength={500} />
       <div className="flex flex-col gap-3 sm:flex-row">

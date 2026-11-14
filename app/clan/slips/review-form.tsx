@@ -5,7 +5,7 @@ import { reviewSlip } from "@/app/actions/slips";
 import { useT } from "@/components/i18n-provider";
 import { Notice, TextAreaField } from "@/components/ui";
 
-export function ReviewSlipForm({ slipId }: { slipId: string }) {
+export function ReviewSlipForm({ slipId, clanId }: { slipId: string; clanId?: string }) {
   const [state, action, pending] = useActionState(reviewSlip, undefined);
   const t = useT().slips;
 
@@ -14,6 +14,7 @@ export function ReviewSlipForm({ slipId }: { slipId: string }) {
   return (
     <form action={action} className="space-y-3" noValidate>
       <input type="hidden" name="slipId" value={slipId} />
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       <TextAreaField label={t.reason} name="note" optional placeholder={t.reasonPlaceholder} errors={state?.errors?.note} maxLength={300} />
       <div className="flex flex-col gap-3 sm:flex-row">

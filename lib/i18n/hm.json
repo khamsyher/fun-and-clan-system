@@ -127,6 +127,7 @@
     "total": "Tag nrho {n}",
     "noClans": "Tseem tsis tau muaj xeem",
     "noClansBody": "Tsim thawj lub xeem thiab tus thawj xeem tus account nrog daim ntawv ib sab.",
+    "chooseClan": "Xaiv ib lub xeem uas qhib kom txuas ntxiv.",
     "colClan": "Xeem",
     "colLeader": "Thawj xeem",
     "colMembers": "Tswv cuab",
@@ -277,7 +278,9 @@
     "owesBody": "{open} rau cov sau nyiaj tseem qhib thiab {debt} nuj nqis qub. Thov them rau koj tus thawj xeem.",
     "openCollections": "Cov sau nyiaj tseem qhib",
     "noOpen": "Tam sim no tsis muaj kev sau nyiaj qhib.",
-    "payWithSlip": "Them nrog daim ntawv xa nyiaj"
+    "payWithSlip": "Them nrog daim ntawv xa nyiaj",
+    "rosterLede": "Saib koj tus thawj xeem thiab cov tswv cuab uas tseem koom.",
+    "noMembers": "Tseem tsis muaj cov tswv cuab siv tau nyob hauv daim ntawv."
   },
   "nav": {
     "members": "Tswv cuab",
@@ -426,6 +429,12 @@
     "report": "Qhia txog xwm txheej",
     "empty": "Tseem tsis tau muaj xwm txheej",
     "emptyBody": "Thaum ib tus tswv cuab los yog nws tsev neeg tuag, qhia ntawm no.",
+    "search": "Nrhiav",
+    "adminSearchPlaceholder": "Tus neeg tuag, npe xeem lossis tus lej xeem",
+    "allStatuses": "Txhua xwm txheej",
+    "noSearchResults": "Tsis pom xwm txheej phim qhov koj nrhiav.",
+    "platformLimited": "Qhia 500 xwm txheej tshiab tshaj. Nrhiav npe neeg lossis xeem kom pom cov xwm txheej qub.",
+    "waitingApprover": "Lwm tus account neeg ua haujlwm yuav tsum pom zoo qhov them nyiaj no.",
     "eventNo": "Zaum #{n}",
     "status": {
       "collecting": "Tab tom sau nyiaj",
@@ -700,6 +709,12 @@
     "unpaidEventLine": "{n} ntawm {total} tsev neeg tsis tau them · qhia {date}",
     "colMember": "Tswv cuab",
     "colPhone": "Xov tooj",
+    "membersReportTitle": "Txhua lub xeem cov tswv cuab",
+    "membersReportLede": "Daim ntawv teev cov account tswv cuab txhua lub xeem, nrog cov ntaub ntawv tiv tauj, txoj hauj lwm thiab xwm txheej account.",
+    "membersReportTotal": "tus tswv cuab hauv daim ntawv no",
+    "membersReportPosition": "Txoj hauj lwm",
+    "membersReportPassedAway": "Tuag lawm",
+    "noMembersReport": "Tsis muaj account tswv cuab los qhia.",
     "colOwes": "Tshuav",
     "billUnpaid": "Tsis tau them",
     "billCarried": "Nuj nqis",
@@ -782,7 +797,8 @@
     "sheetLedger": "Phau nyiaj",
     "sheetContributions": "Nyiaj khaws",
     "sheetClans": "Cov xeem",
-    "sheetFees": "Nqi txhua hli"
+    "sheetFees": "Nqi txhua hli",
+    "sheetMembers": "Tswv cuab"
   },
   "donations": {
     "fMedia": "Duab thiab video",

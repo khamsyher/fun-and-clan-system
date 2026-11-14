@@ -54,6 +54,8 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
           { href: "/admin/fund", label: t.fundAdmin.title },
           { href: "/admin/savings", label: t.savingsAdmin.title },
           { href: "/admin/users", label: t.nav.users },
+          { href: "/admin/events", label: t.nav.events },
+          { href: "/admin/events/slips", label: t.nav.slips },
           // Conversations with something unread from the person.
           { href: "/admin/support", label: t.support.inboxTitle, badge: badges.supportUnread },
           // The badge keeps the queue visible after the notification has been read.
@@ -99,6 +101,7 @@ export function areasFor(user: CurrentUser, t: Dictionary, badges: { kycWaiting?
       owns: [],
       sections: [
         { href: "/member", label: t.nav.overview },
+        { href: "/member/members", label: t.nav.members },
         { href: "/member/events", label: t.nav.events },
         { href: "/member/payments", label: t.nav.payments },
         ...(user.isTreasurer ? [{ href: "/member/approvals", label: t.nav.approvals }] : []),

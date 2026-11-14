@@ -15,11 +15,13 @@ export function BillControls({
   status,
   carriedIn,
   viaSlip = false,
+  clanId,
 }: {
   billId: string;
   status: string;
   carriedIn: number;
   viaSlip?: boolean;
+  clanId?: string;
 }) {
   const t = useT().events;
   const [open, setOpen] = useState(false);
@@ -33,6 +35,7 @@ export function BillControls({
     return (
       <form action={undoAction} className="inline">
         <input type="hidden" name="billId" value={billId} />
+        {clanId && <input type="hidden" name="clanId" value={clanId} />}
         <button type="submit" disabled={undoing} className="rounded-md px-2.5 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink">
           {t.undo}
         </button>
@@ -57,6 +60,7 @@ export function BillControls({
   return (
     <form action={payAction} className="flex flex-wrap items-center justify-end gap-2">
       <input type="hidden" name="billId" value={billId} />
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       <select name="method" aria-label={t.paidMethod} className="h-9 rounded-md border border-line-strong bg-surface px-2 text-sm">
         <option value="cash">{t.method.cash}</option>
         <option value="transfer">{t.method.transfer}</option>
@@ -83,10 +87,12 @@ export function ConfirmEventAction({
   kind,
   eventId,
   confirmText,
+  clanId,
 }: {
   kind: "close" | "cancel";
   eventId: string;
   confirmText: string;
+  clanId?: string;
 }) {
   const t = useT().events;
   const [state, action, pending] = useActionState(kind === "close" ? closeCollection : cancelEvent, undefined);
@@ -111,6 +117,7 @@ export function ConfirmEventAction({
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="eventId" value={eventId} />
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       <span className="text-sm text-ink">{confirmText}</span>
       <button type="button" onClick={() => setConfirming(false)} className="rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-sunken">
         {t.cancel}
@@ -133,12 +140,14 @@ export function PayoutRequestForm({
   available,
   feeNote,
   defaultReceiver,
+  clanId,
 }: {
   eventId: string;
   suggested: number | null;
   available: number;
   feeNote: string | null;
   defaultReceiver: string;
+  clanId?: string;
 }) {
   const t = useT().events;
   const [state, action] = useActionState(requestPayout, undefined);
@@ -148,6 +157,7 @@ export function PayoutRequestForm({
   return (
     <form action={action} className="space-y-4" noValidate>
       <input type="hidden" name="eventId" value={eventId} />
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       <Field
         label={t.payoutAmount}
@@ -171,13 +181,14 @@ export function PayoutRequestForm({
   );
 }
 
-export function MarkPaidForm({ payoutId }: { payoutId: string }) {
+export function MarkPaidForm({ payoutId, clanId }: { payoutId: string; clanId?: string }) {
   const tt = useT();
   const t = tt.events;
   const [state, action] = useActionState(markPayoutPaid, undefined);
   return (
     <form action={action} className="space-y-4" noValidate>
       <input type="hidden" name="payoutId" value={payoutId} />
+      {clanId && <input type="hidden" name="clanId" value={clanId} />}
       {state?.message && <Notice tone="error">{state.message}</Notice>}
       <SelectField
         label={t.paidMethod}

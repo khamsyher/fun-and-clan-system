@@ -20,7 +20,35 @@ export type AdminUserRow = {
   clan_code: string | null;
 };
 
+export type AdminUserListRow = AdminUserRow & { photo_file_id: string | null };
+
+export type PlatformMemberReportRow = {
+  id: string;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  village: string | null;
+  status: UserStatus;
+  is_treasurer: boolean;
+  deceased_at: Date | null;
+  created_at: Date;
+  clan_name: string | null;
+  clan_code: string | null;
+};
+
 export type PeopleCounts = { everyone: string; leaders: string; members: string; general: string; waiting: string };
+
+/** Every member account across the platform, including inactive and deceased accounts. */
+export function listPlatformMembersReport() {
+  return query<PlatformMemberReportRow>(
+    `SELECT u.id, u.full_name, u.phone, u.email, u.village, u.status, u.is_treasurer, u.deceased_at, u.created_at,
+            c.name AS clan_name, c.code AS clan_code
+       FROM users u
+       LEFT JOIN clans c ON c.id = u.clan_id
+      WHERE u.role = 'member'
+      ORDER BY lower(c.name), lower(u.full_name), u.created_at`,
+  );
+}
 
 /**
  * How many accounts of each kind there are.
@@ -44,8 +72,8 @@ export function listUsers({ people = "all", q = "" }: { people?: string; q?: str
   const role = PEOPLE_FILTERS[people] ?? null;
   const waitingOnly = people === "waiting";
   const search = q.trim() ? q.trim() : null;
-  return query<AdminUserRow>(
-    `SELECT u.id, u.full_name, u.phone, u.email, u.village, u.role, u.status, u.is_treasurer,
+  return query<AdminUserListRow>(
+    `SELECT u.id, u.full_name, u.phone, u.email, u.village, u.photo_file_id, u.role, u.status, u.is_treasurer,
             u.created_at, u.last_login_at, c.name AS clan_name, c.code AS clan_code
        FROM users u
        LEFT JOIN clans c ON c.id = u.clan_id

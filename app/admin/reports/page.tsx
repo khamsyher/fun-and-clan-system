@@ -26,6 +26,14 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
     <>
       <PageHeading title={rt.adminTitle} lede={rt.adminLede} />
       <ReportRange base="/admin/reports" from={range.from} to={range.to} t={t} valid={range.valid} />
+      <div className="mt-4">
+        <Link
+          href="/admin/reports/members"
+          className="inline-flex h-11 items-center justify-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-brand hover:bg-brand-wash"
+        >
+          {rt.membersReportTitle}
+        </Link>
+      </div>
 
       <p className="mt-6 text-sm font-medium text-ink-soft">
         {fmt(rt.period, { from: formatDate(r.from, locale), to: formatDate(r.to, locale) })}

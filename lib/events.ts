@@ -7,6 +7,9 @@ export type PayoutStatus = "requested" | "approved" | "rejected" | "paid";
 
 export type EventRow = {
   id: string;
+  clan_id: string;
+  clan_name: string;
+  clan_code: string;
   event_no: number;
   deceased_name: string;
   deceased_relationship: "spouse" | "child" | "father" | "mother" | null;
@@ -32,7 +35,8 @@ export type EventRow = {
 };
 
 const EVENT_SELECT = `
-  SELECT e.id, e.event_no, e.deceased_name, e.deceased_relationship, f.full_name AS family_name, e.family_member_id,
+  SELECT e.id, e.clan_id, c.name AS clan_name, c.code AS clan_code,
+         e.event_no, e.deceased_name, e.deceased_relationship, f.full_name AS family_name, e.family_member_id,
          e.date_of_death, e.note, e.fund_mode, e.rate_version, e.rate_amount, e.platform_fee_percent, e.status,
          e.gross_collected, e.fee_amount, e.reported_at, e.closed_at, e.completed_at,
          COUNT(b.id) FILTER (WHERE b.status <> 'void') AS bills_total,
@@ -41,21 +45,50 @@ const EVENT_SELECT = `
          COALESCE(SUM(b.amount) FILTER (WHERE b.status <> 'void'), 0) AS expected
     FROM death_events e
     JOIN users f ON f.id = e.family_member_id
+    JOIN clans c ON c.id = e.clan_id
     LEFT JOIN event_bills b ON b.event_id = e.id`;
 
 /** All events of one clan, newest first. */
 export function listEvents(clanId: string) {
-  return query<EventRow>(`${EVENT_SELECT} WHERE e.clan_id = $1 GROUP BY e.id, f.full_name ORDER BY e.event_no DESC`, [clanId]);
+  return query<EventRow>(`${EVENT_SELECT} WHERE e.clan_id = $1 GROUP BY e.id, f.full_name, c.name, c.code ORDER BY e.event_no DESC`, [clanId]);
 }
 
 /** One event, only if it belongs to the clan. */
 export function getEvent(clanId: string, eventId: string) {
   if (!/^[0-9a-f-]{36}$/i.test(eventId)) return Promise.resolve(null);
-  return queryOne<EventRow>(`${EVENT_SELECT} WHERE e.clan_id = $1 AND e.id = $2 GROUP BY e.id, f.full_name`, [clanId, eventId]);
+  return queryOne<EventRow>(
+    `${EVENT_SELECT} WHERE e.clan_id = $1 AND e.id = $2 GROUP BY e.id, f.full_name, c.name, c.code`,
+    [clanId, eventId],
+  );
+}
+
+/** Searchable platform-wide event list, newest first. */
+export function listPlatformEvents({ q = "", status = "all" }: { q?: string; status?: string } = {}) {
+  const search = q.trim() || "";
+  const validStatus = ["collecting", "awaiting_payout", "completed", "cancelled"].includes(status) ? status : "all";
+  return query<EventRow>(
+    `${EVENT_SELECT}
+      WHERE ($1 = '' OR e.deceased_name ILIKE '%' || $1 || '%' OR c.name ILIKE '%' || $1 || '%' OR c.code ILIKE '%' || $1 || '%')
+        AND ($2 = 'all' OR e.status::text = $2)
+      GROUP BY e.id, f.full_name, c.name, c.code
+      ORDER BY e.reported_at DESC
+      LIMIT 500`,
+    [search, validStatus],
+  );
+}
+
+/** One event by ID for an authorized platform-staff workflow. */
+export function getPlatformEvent(eventId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(eventId)) return Promise.resolve(null);
+  return queryOne<EventRow>(
+    `${EVENT_SELECT} WHERE e.id = $1 GROUP BY e.id, f.full_name, c.name, c.code`,
+    [eventId],
+  );
 }
 
 export type PayoutRow = {
   id: string;
+  requested_by: string;
   amount: string;
   receiver_name: string;
   receiver_phone: string | null;
@@ -74,7 +107,7 @@ export type PayoutRow = {
 /** Every payout attempt for an event (rejected ones included), newest first. */
 export function listPayouts(clanId: string, eventId: string) {
   return query<PayoutRow>(
-    `SELECT p.id, p.amount, p.receiver_name, p.receiver_phone, p.note, p.status,
+    `SELECT p.id, p.requested_by, p.amount, p.receiver_name, p.receiver_phone, p.note, p.status,
             r.full_name AS requested_by_name, p.requested_at,
             d.full_name AS decided_by_name, p.decided_at, p.decision_note,
             p.paid_at, p.paid_method, p.proof_file_id

@@ -8,6 +8,7 @@ import { readUpload } from "@/lib/files";
 import { audit, isPastDate, lockClan, parseKip, settleCarried, UUID_RE } from "@/lib/funds";
 import { clanLeaderId, notify } from "@/lib/notify";
 import { formatKip } from "@/lib/format";
+import { STAFF_ROLES } from "@/lib/definitions";
 import { getT } from "@/lib/i18n/server";
 import type { FormState } from "@/lib/definitions";
 
@@ -98,21 +99,22 @@ export async function uploadSlip(_state: FormState, formData: FormData): Promise
 
 /** The leader approves a slip (which records the payment) or rejects it with a reason. */
 export async function reviewSlip(_state: FormState, formData: FormData): Promise<FormState> {
-  const leader = await requireRole("clan_admin");
+  const leader = await requireRole("clan_admin", ...STAFF_ROLES);
   const t = (await getT()).slips;
+  const clanId = leader.role === "clan_admin" ? leader.clanId ?? "" : String(formData.get("clanId") ?? "");
   const slipId = String(formData.get("slipId") ?? "");
   const decision = formData.get("decision") === "approve" ? "approved" : "rejected";
   const note = String(formData.get("note") ?? "").trim().slice(0, 300) || null;
-  if (!UUID_RE.test(slipId)) return { message: t.errState };
+  if (!UUID_RE.test(clanId) || !UUID_RE.test(slipId)) return { message: t.errState };
   if (decision === "rejected" && !note) return { errors: { note: [t.errReason] } };
 
   const result = await transaction(async (db): Promise<FormState> => {
-    await lockClan(db, leader.clanId!);
+    await lockClan(db, clanId);
     const slip = (
       await db.query<{ id: string; member_id: string; bill_id: string | null; due_id: string | null; include_debt: boolean }>(
         `SELECT id, member_id, bill_id, due_id, include_debt FROM payment_slips
           WHERE id = $1 AND clan_id = $2 AND status = 'pending' FOR UPDATE`,
-        [slipId, leader.clanId],
+        [slipId, clanId],
       )
     ).rows[0];
     if (!slip) return { message: t.errState };
@@ -123,10 +125,11 @@ export async function reviewSlip(_state: FormState, formData: FormData): Promise
           await db.query<{ id: string; amount: string; event_id: string; status: string; event_status: string }>(
             `SELECT b.id, b.amount, b.event_id, b.status, e.status AS event_status
                FROM event_bills b JOIN death_events e ON e.id = b.event_id
-              WHERE b.id = $1 FOR UPDATE OF b`,
-            [slip.bill_id],
+              WHERE b.id = $1 AND b.clan_id = $2 AND e.clan_id = $2 FOR UPDATE OF b`,
+            [slip.bill_id, clanId],
           )
         ).rows[0];
+        if (!bill) return { message: t.errState };
         if (bill.status === "unpaid" && bill.event_status === "collecting") {
           await db.query(`UPDATE event_bills SET status = 'paid', paid_at = now(), paid_method = 'transfer', recorded_by = $2 WHERE id = $1`, [
             bill.id,
@@ -135,13 +138,13 @@ export async function reviewSlip(_state: FormState, formData: FormData): Promise
           await db.query(
             `INSERT INTO fund_ledger (clan_id, entry_type, amount, event_id, bill_id, slip_id, note, created_by)
              VALUES ($1, 'collection', $2, $3, $4, $5, 'slip', $6)`,
-            [leader.clanId, bill.amount, bill.event_id, bill.id, slip.id, leader.id],
+            [clanId, bill.amount, bill.event_id, bill.id, slip.id, leader.id],
           );
-          if (slip.include_debt) await settleCarried(db, leader.clanId!, leader.id, slip.member_id, "transfer", slip.id);
+          if (slip.include_debt) await settleCarried(db, clanId, leader.id, slip.member_id, "transfer", slip.id);
         } else if (bill.status === "carried" || (bill.status === "unpaid" && bill.event_status !== "collecting")) {
           // The collection closed after the upload: the bill is (or becomes) debt, so settle it as debt.
           if (bill.status === "unpaid") await db.query(`UPDATE event_bills SET status = 'carried' WHERE id = $1`, [bill.id]);
-          await settleCarried(db, leader.clanId!, leader.id, slip.member_id, "transfer", slip.id);
+          await settleCarried(db, clanId, leader.id, slip.member_id, "transfer", slip.id);
         } else {
           return { message: t.errAlreadyPaid };
         }
@@ -149,15 +152,15 @@ export async function reviewSlip(_state: FormState, formData: FormData): Promise
         const due = (
           await db.query<{ id: string; amount: string }>(
             `UPDATE contribution_dues SET status = 'paid', paid_at = now(), paid_method = 'transfer', recorded_by = $2
-              WHERE id = $1 AND status = 'unpaid' RETURNING id, amount`,
-            [slip.due_id, leader.id],
+              WHERE id = $1 AND status = 'unpaid' AND clan_id = $3 RETURNING id, amount`,
+            [slip.due_id, leader.id, clanId],
           )
         ).rows[0];
         if (!due) return { message: t.errAlreadyPaid };
         await db.query(
           `INSERT INTO fund_ledger (clan_id, entry_type, amount, due_id, slip_id, note, created_by)
            VALUES ($1, 'contribution', $2, $3, $4, 'slip', $5)`,
-          [leader.clanId, due.amount, due.id, slip.id, leader.id],
+          [clanId, due.amount, due.id, slip.id, leader.id],
         );
       }
     }
@@ -168,7 +171,7 @@ export async function reviewSlip(_state: FormState, formData: FormData): Promise
       leader.id,
       note,
     ]);
-    await audit(db, leader.clanId, leader.id, `slip.${decision}`, slip.id, note ? { note } : undefined);
+    await audit(db, clanId, leader.id, `slip.${decision}`, slip.id, note ? { note } : undefined);
     const paid = (await db.query<{ amount_claimed: string }>(`SELECT amount_claimed FROM payment_slips WHERE id = $1`, [slip.id])).rows[0];
     await notify(
       db,
@@ -180,6 +183,10 @@ export async function reviewSlip(_state: FormState, formData: FormData): Promise
     return { success: decision === "approved" ? t.approved : t.rejected };
   });
 
-  if (result?.success) refresh();
+  if (result?.success) {
+    refresh();
+    revalidatePath("/admin/events", "layout");
+    revalidatePath("/admin");
+  }
   return result;
 }

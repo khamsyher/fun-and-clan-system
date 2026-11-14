@@ -4,6 +4,7 @@ import { fmt, type Dictionary, type Locale } from "../i18n/config";
 import { formatDate } from "../format";
 import { ledgerDetail, summaryRows } from "../report-text";
 import type { ClanReport, PlatformReport } from "../reports";
+import type { PlatformMemberReportRow } from "../users";
 
 const BRAND = "FF12357A";
 const WASH = "FFE6EDFB";
@@ -172,5 +173,34 @@ export async function platformWorkbook(r: PlatformReport, t: Dictionary, locale:
   sTotal.font = { bold: true };
   money(sTotal, 7, 8, 9);
 
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+export async function platformMembersWorkbook(rows: PlatformMemberReportRow[], t: Dictionary, locale: Locale, generatedBy: string) {
+  const rt = t.reports;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Clan Fund";
+  wb.created = new Date();
+  const ws = wb.addWorksheet(rt.sheetMembers);
+  titleBlock(ws, rt.membersReportTitle, fmt(rt.generated, { date: formatDate(new Date(), locale), name: generatedBy }));
+  header(
+    ws,
+    [rt.colMember, rt.colPhone, t.member.email, t.member.village, rt.colClan, t.admin.colRole, rt.membersReportPosition, t.admin.colStatus, t.admin.colJoined, rt.membersReportPassedAway],
+    [28, 17, 28, 22, 32, 18, 18, 18, 16, 16],
+  );
+  for (const member of rows) {
+    ws.addRow([
+      member.full_name,
+      member.phone,
+      member.email ?? "",
+      member.village ?? "",
+      member.clan_name ? `${member.clan_name}${member.clan_code ? ` (${member.clan_code})` : ""}` : "",
+      t.roles.member,
+      member.is_treasurer ? t.treasurer.badge : t.roles.member,
+      t.status[member.status],
+      formatDate(member.created_at, locale),
+      member.deceased_at ? formatDate(member.deceased_at, locale) : "",
+    ]);
+  }
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

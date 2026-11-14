@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHeading } from "@/components/app-shell";
 import { Pill, StatusBadge } from "@/components/badge";
 import { ArrowRightIcon } from "@/components/icons";
+import { Avatar } from "@/components/profile-facts";
 import { Notice } from "@/components/ui";
 import { canManageAccount } from "@/lib/access";
 import { requireRole } from "@/lib/dal";
@@ -117,16 +118,21 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
             <tbody className="divide-y divide-line">
               {users.map((p) => (
                 <tr key={p.id}>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <Link href={`/admin/users/${p.id}`} className="font-medium text-brand hover:text-brand-bright">
-                      {p.full_name}
-                    </Link>
-                    {p.is_treasurer && (
-                      <span className="ml-2 align-middle">
-                        <Pill tone="info">{t.treasurer.badge}</Pill>
-                      </span>
-                    )}
-                    {p.email && <p className="text-xs text-muted">{p.email}</p>}
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <Avatar fileId={p.photo_file_id} name={p.full_name} size={40} />
+                      <div className="min-w-0 whitespace-nowrap">
+                        <Link href={`/admin/users/${p.id}`} className="font-medium text-brand hover:text-brand-bright">
+                          {p.full_name}
+                        </Link>
+                        {p.is_treasurer && (
+                          <span className="ml-2 align-middle">
+                            <Pill tone="info">{t.treasurer.badge}</Pill>
+                          </span>
+                        )}
+                        {p.email && <p className="text-xs text-muted">{p.email}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className="tabular px-4 py-3.5 whitespace-nowrap text-ink-soft">{p.phone}</td>
                   <td className="px-4 py-3.5 whitespace-nowrap text-ink-soft">{t.roles[p.role]}</td>
